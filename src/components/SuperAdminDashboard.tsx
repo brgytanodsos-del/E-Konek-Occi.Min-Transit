@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { Panel1 } from './panels/Panel1';
-import { Panel2 } from './panels/Panel2';
-import { Panel3 } from './panels/Panel3';
+import { Panel1 } from '../features/montenegro/Panel1';
+import { Panel2 } from '../features/land/Panel2';
+import { Panel3 } from '../features/passenger/Panel3';
+import { useApp } from '../context/AppContext';
 
 export const SuperAdminDashboard = () => {
   const [activePanel, setActivePanel] = useState<'montenegro' | 'land' | 'passenger'>('montenegro');
+  const { setCurrentRole, setIsAuthenticated } = useApp();
+
+  const handleLogout = () => {
+    setCurrentRole(null);
+    setIsAuthenticated(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -18,7 +25,10 @@ export const SuperAdminDashboard = () => {
               <p className="text-sm text-gray-500">E-Konek Occidental Mindoro Transit</p>
             </div>
           </div>
-          <div className="text-sm text-green-600 font-medium">● ONLINE</div>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-green-600 font-medium">● ONLINE</div>
+            <button onClick={handleLogout} className="text-red-500 text-sm font-medium">Logout</button>
+          </div>
         </div>
       </header>
 

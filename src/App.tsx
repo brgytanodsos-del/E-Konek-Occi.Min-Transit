@@ -1,31 +1,30 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AppProvider, useApp } from './context/AppContext';
 import { LoginScreen } from './components/LoginScreen';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useApp();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/" />;
+}
 
 export default function App() {
   return (
     <AppProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<LoginScreenWrapper />} />
-          <Route path="/dashboard" element={<SuperAdminDashboard />} />
+          <Route path="/" element={<LoginScreen />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
     </AppProvider>
   );
 }
-
-// Small wrapper for login redirect
-const LoginScreenWrapper = () => {
-  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
-
-  if (isLoggedIn) {
-     // For demo purposes, we will handle the redirect within the App structure
-    window.location.href = '/dashboard';
-    return null;
-  }
-
-  return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
-};

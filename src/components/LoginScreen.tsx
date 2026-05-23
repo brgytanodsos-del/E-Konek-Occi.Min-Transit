@@ -1,106 +1,79 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 
-interface LoginScreenProps {
-  onLogin: () => void;
-}
+const ROLE_PINS: Record<string, string | null> = {
+  port: '2001',
+  terminal: '2002',
+  passenger: null,
+  superadmin: '1234',
+};
 
-export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'port' | 'terminal' | 'passenger'>('superadmin');
-  const [loading, setLoading] = useState(false);
+const roleOptions = [
+  { value: 'port', label: '🚢 Port Staff', desc: 'Abra Port Ticketing Station' },
+  { value: 'terminal', label: '🚐 Terminal Staff', desc: 'Mamburao Grand Terminal' },
+  { value: 'passenger', label: '👤 Passenger', desc: 'Book Tickets & Track Rides' },
+  { value: 'superadmin', label: '🔐 Super Admin', desc: 'System Administration' },
+];
+
+export const LoginScreen = () => {
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
   const { setCurrentRole, setIsAuthenticated } = useApp();
 
-  const roleOptions = [
-    { value: 'superadmin', label: '🔐 Super Admin', desc: 'System Administration' },
-    { value: 'port', label: '🚢 Port Staff', desc: 'Abra Port Ticketing' },
-    { value: 'terminal', label: '🚐 Terminal Staff', desc: 'Mamburao Terminal' },
-    { value: 'passenger', label: '👤 Passenger', desc: 'Book Tickets & Track' },
-  ];
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    setTimeout(() => {
-      setCurrentRole(selectedRole);
+  const handleRoleSelect = (role: string) => {
+    if (ROLE_PINS[role] === null) {
+      setCurrentRole(role as any);
       setIsAuthenticated(true);
-      setLoading(false);
-      onLogin();
-    }, 900);
+    } else {
+      setSelectedRole(role);
+      setPin('');
+      setError(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#003087] via-[#0F172A] to-black flex items-center justify-center p-4">
-      <div className="glass w-full max-w-md rounded-3xl p-8 shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto bg-white rounded-2xl flex items-center justify-center text-5xl mb-4 shadow-inner">
-            🚢
-          </div>
-          <h1 className="text-3xl font-bold text-white">E-Konek Occi.Min</h1>
-          <p className="text-blue-200 mt-1">Occidental Mindoro Transit System</p>
+  const handlePinSubmit = () => {
+    if (pin === ROLE_PINS[selectedRole!]) {
+      setCurrentRole(selectedRole as any);
+      setIsAuthenticated(true);
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 500);
+    }
+  };
+
+  if (selectedRole) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F4F8] p-4 text-[#003580]">
+        <h2 className="text-2xl font-bold mb-4">{roleOptions.find(r => r.value === selectedRole)?.label}</h2>
+        <div className="flex gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+                <div key={i} className={`w-6 h-6 rounded-full border-2 border-[#003580] ${pin.length > i ? 'bg-[#003580]' : ''}`} />
+            ))}
         </div>
+        <div className="grid grid-cols-3 gap-4">
+            {[1,2,3,4,5,6,7,8,9,0].map(digit => (
+                <button key={digit} className="w-16 h-16 rounded-full bg-white shadow-md text-2xl font-bold hover:bg-gray-100" onClick={() => pin.length < 4 && setPin(pin + digit)}>{digit}</button>
+            ))}
+            <button className="w-16 h-16 rounded-full bg-red-100 text-red-600 font-bold" onClick={() => setPin('')}>Clear</button>
+            <button className="w-16 h-16 rounded-full bg-[#00A651] text-white font-bold" onClick={handlePinSubmit}>Enter</button>
+        </div>
+        {error && <p className="text-red-500 mt-4 animate-pulse">Incorrect PIN. Try again.</p>}
+        <button className="mt-8 text-gray-500" onClick={() => setSelectedRole(null)}>Cancel</button>
+      </div>
+    );
+  }
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {/* Role Selection */}
-          <div>
-            <label className="block text-sm text-gray-200 mb-3">Select Login Role</label>
-            <div className="grid gap-3">
-              {roleOptions.map((role) => (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => setSelectedRole(role.value as any)}
-                  className={`p-4 rounded-2xl text-left transition-all border ${
-                    selectedRole === role.value 
-                      ? 'border-[#00A651] bg-[#00A651]/10' 
-                      : 'border-gray-700 hover:border-gray-500'
-                  }`}
-                >
-                  <div className="font-medium">{role.label}</div>
-                  <div className="text-sm text-gray-400">{role.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-200 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-5 py-4 rounded-2xl border border-gray-600 bg-transparent text-white placeholder-gray-400 focus:border-[#00A651] outline-none"
-              placeholder="admin@ekonek.gov.ph"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-200 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-4 rounded-2xl border border-gray-600 bg-transparent text-white placeholder-gray-400 focus:border-[#00A651] outline-none"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#00A651] hover:bg-green-600 py-4 rounded-2xl font-semibold text-lg transition-all disabled:opacity-70 tap-target cursor-pointer"
-          >
-            {loading ? 'Logging in...' : `Login as ${selectedRole === 'superadmin' ? 'Super Admin' : selectedRole}`}
+  return (
+    <div className="min-h-screen bg-[#003580] flex flex-col items-center justify-center p-4">
+      <h1 className="text-4xl font-bold text-white mb-12">MindoroTransit</h1>
+      <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+        {roleOptions.map(role => (
+          <button key={role.value} onClick={() => handleRoleSelect(role.value)} className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all text-left">
+            <div className="text-3xl mb-2">{role.label.split(' ')[0]}</div>
+            <div className="font-bold text-[#003580]">{role.label.split(' ')[1]} {role.label.split(' ')[2]}</div>
           </button>
-        </form>
-
-        <p className="text-center text-xs text-gray-400 mt-8">
-          Provincial Government of Occidental Mindoro
-        </p>
+        ))}
       </div>
     </div>
   );
