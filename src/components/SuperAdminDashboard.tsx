@@ -21,7 +21,9 @@ export const SuperAdminDashboard = () => {
     setPayoutHistory,
     auditLog,
     setAuditLog,
-    formatPST
+    formatPST,
+    updateTransaction,
+    persistPayout
   } = useApp();
 
   const navigate = useNavigate();
@@ -215,8 +217,8 @@ export const SuperAdminDashboard = () => {
                     : 'text-gray-400 hover:bg-gray-50'
                 }`}
               >
-                <span className="text-lg">🚢</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Port</span>
+                <i className={`fa-solid fa-ship text-lg ${adminActiveTab === 0 ? 'text-[#003087]' : 'text-gray-400'}`}></i>
+                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Port</span>
               </button>
 
               <button
@@ -227,8 +229,8 @@ export const SuperAdminDashboard = () => {
                     : 'text-gray-400 hover:bg-gray-50'
                 }`}
               >
-                <span className="text-lg">🚐</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Terminal</span>
+                <i className={`fa-solid fa-bus text-lg ${adminActiveTab === 1 ? 'text-[#FF8800]' : 'text-gray-400'}`}></i>
+                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Hub</span>
               </button>
 
               <button
@@ -239,8 +241,8 @@ export const SuperAdminDashboard = () => {
                     : 'text-gray-400 hover:bg-gray-50'
                 }`}
               >
-                <span className="text-lg">👤</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Passenger</span>
+                <i className={`fa-solid fa-user-check text-lg ${adminActiveTab === 2 ? 'text-emerald-500' : 'text-gray-400'}`}></i>
+                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Booking</span>
               </button>
 
               <button
@@ -251,8 +253,8 @@ export const SuperAdminDashboard = () => {
                     : 'text-gray-400 hover:bg-gray-50'
                 }`}
               >
-                <span className="text-lg">🔐</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Admin</span>
+                <i className={`fa-solid fa-shield-halved text-lg ${adminActiveTab === 3 ? 'text-indigo-600' : 'text-gray-400'}`}></i>
+                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Admin</span>
               </button>
             </nav>
 
@@ -283,8 +285,70 @@ const AdminReportSectionPanel4 = () => {
     payoutHistory,
     setPayoutHistory,
     auditLog,
-    formatPST
+    formatPST,
+    updateTransaction,
+    persistPayout,
+    adminAccounts
   } = useApp();
+
+  // Admin Account Generation Drawer
+  const [isAdminDrawerOpen, setIsAdminDrawerOpen] = useState(false);
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'port' | 'terminal'>('port');
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+ 
+  const handleApproveAdmin = async (id: string, fullName: string) => {
+    try {
+      const { fsUpdate } = await import('../lib/firebase');
+      await fsUpdate('adminAccounts', id, { status: 'active' });
+      alert(`Account for ${fullName} approved successfully!`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to approve account");
+    }
+  };
+
+  const handleRejectAdmin = async (id: string, fullName: string) => {
+    if (!confirm(`Are you sure you want to REJECT and DELETE the application for ${fullName}?`)) return;
+    try {
+      const { fsDelete } = await import('../lib/firebase');
+      await fsDelete('adminAccounts', id);
+      alert(`Application for ${fullName} rejected.`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to reject application");
+    }
+  };
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminName || !newAdminPin) return alert("Please fill all fields");
+    if (newAdminPin.length !== 4) return alert("PIN must be exactly 4 digits");
+
+    setIsCreatingAdmin(true);
+    try {
+      const { fsSet } = await import('../lib/firebase');
+      const newAdmin = {
+        id: 'adm-' + Math.random().toString(36).substr(2, 9),
+        fullName: newAdminName,
+        role: newAdminRole,
+        pin: newAdminPin,
+        createdAt: new Date().toISOString(),
+        status: 'active'
+      };
+      await fsSet('adminAccounts', newAdmin.id, newAdmin);
+      setNewAdminName('');
+      setNewAdminPin('');
+      setIsAdminDrawerOpen(false);
+      alert("Staff Admin account generated successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create admin account");
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
 
   // Search/Filter states
   const [filterType, setFilterType] = useState('All');
@@ -330,14 +394,15 @@ const AdminReportSectionPanel4 = () => {
   const filteredList = getFilteredTransactions();
 
   // Refund handler
-  const handleRefund = (txId: string) => {
+  const handleRefund = async (txId: string) => {
     if (confirm("Are you sure you want to REFUND this ticket transaction? This action will reverse commissions.")) {
       setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'Refunded' } : t));
+      await updateTransaction(txId, { status: 'Refunded' });
     }
   };
 
   // Payout processing
-  const handleMarkAllAsPaid = () => {
+  const handleMarkAllAsPaid = async () => {
     const unpaidList = completedTx.filter(t => !t.paid);
     if (unpaidList.length === 0) return alert("No outstanding pending payouts to settle.");
 
@@ -346,6 +411,9 @@ const AdminReportSectionPanel4 = () => {
 
     // Set paid true on database/state
     setTransactions(prev => prev.map(t => t.status === 'Completed' ? { ...t, paid: true } : t));
+    for (const tx of unpaidList) {
+      await updateTransaction(tx.id, { paid: true });
+    }
 
     // Log payout event
     const newPayout = {
@@ -356,6 +424,7 @@ const AdminReportSectionPanel4 = () => {
     };
 
     setPayoutHistory(prev => [newPayout, ...prev]);
+    await persistPayout(newPayout);
     alert(`Successfully processed payout for ₱${totalPaid} across ${count} completion logs!`);
   };
 
@@ -403,10 +472,183 @@ const AdminReportSectionPanel4 = () => {
   return (
     <div className="p-6 space-y-8 animate-fade-in text-[#2D3748]">
       
-      <div>
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <h1 className="text-2xl font-black text-[#003580] tracking-tight font-sans">🛡️ Super Admin Control and Financial Console</h1>
-        <p className="text-gray-500 text-xs mt-0.5">Review transit commission margins, payroll payouts, log audits, and system registries.</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsAdminDrawerOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-4.5 py-2.5 rounded-xl shadow cursor-pointer transition flex items-center gap-2"
+          >
+            <i className="fa-solid fa-user-shield"></i> Staff Admin Registry
+          </button>
+          <p className="text-gray-500 text-xs mt-0.5 hidden sm:block">Review transit commission margins, payroll payouts, log audits, and system registries.</p>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {isAdminDrawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAdminDrawerOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000]"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-sm bg-white z-[1001] shadow-2xl flex flex-col"
+            >
+              <div className="p-6 border-b flex justify-between items-center bg-indigo-50">
+                <h3 className="font-black text-indigo-900 uppercase tracking-widest text-sm flex items-center gap-2">
+                  <i className="fa-solid fa-id-card-clip"></i> Staff Access Registry
+                </h3>
+                <button onClick={() => setIsAdminDrawerOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <i className="fa-solid fa-xmark text-lg"></i>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Pending Approvals Section */}
+                {adminAccounts.some(a => a.status === 'pending') && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
+                       <i className="fa-solid fa-clock-rotate-left"></i> Pending Approvals
+                    </h4>
+                    <div className="space-y-2">
+                      {adminAccounts.filter(a => a.status === 'pending').map(adm => (
+                        <div key={adm.id} className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-3 shadow-sm">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xs uppercase shadow-inner border border-amber-200">
+                                {adm.fullName.charAt(0)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-slate-800 truncate">{adm.fullName}</p>
+                                <p className="text-[9px] font-bold text-amber-700 uppercase flex items-center gap-1 mt-0.5">
+                                   <span className="opacity-60">{adm.role === 'port' ? '🚢 Port' : '🚐 Terminal'}</span>
+                                   <span className="mx-1">•</span>
+                                   <span>{formatPST(adm.createdAt).split(',')[0]}</span>
+                                </p>
+                              </div>
+                           </div>
+                           <div className="flex gap-2">
+                              <button 
+                                onClick={() => handleApproveAdmin(adm.id, adm.fullName)}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition shadow-md"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => handleRejectAdmin(adm.id, adm.fullName)}
+                                className="flex-1 bg-white hover:bg-rose-50 text-rose-500 border border-rose-200 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition"
+                              >
+                                Reject
+                              </button>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateAdmin} className="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <h4 className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-2">Issue New Access</h4>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Staff Full Name</label>
+                    <input
+                      required
+                      type="text"
+                      value={newAdminName}
+                      onChange={e => setNewAdminName(e.target.value)}
+                      placeholder="e.g. Juan De La Cruz"
+                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Station</label>
+                    <select
+                      value={newAdminRole}
+                      onChange={e => setNewAdminRole(e.target.value as 'port' | 'terminal')}
+                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="port">🚢 Abra Port Staff</option>
+                      <option value="terminal">🚐 Mamburao Terminal Staff</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Set 4-Digit PIN</label>
+                    <input
+                      required
+                      type="password"
+                      maxLength={4}
+                      pattern="\d{4}"
+                      value={newAdminPin}
+                      onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••"
+                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <button
+                    disabled={isCreatingAdmin}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl shadow-lg transition disabled:opacity-50"
+                  >
+                    {isCreatingAdmin ? 'Processing...' : 'Authorize Staff Account'}
+                  </button>
+                </form>
+
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                    <i className="fa-solid fa-users-gear text-xs"></i> Authorized Personnel ({adminAccounts.filter(a => a.status === 'active').length})
+                  </h4>
+                  <div className="divide-y border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                    {adminAccounts.filter(a => a.status === 'active').length === 0 ? (
+                      <p className="p-4 text-center text-xs text-gray-400 font-medium">No active staff admins assigned.</p>
+                    ) : (
+                      adminAccounts.filter(a => a.status === 'active').map((adm) => (
+                        <div key={adm.id} className="p-4 bg-white flex justify-between items-center group hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-[10px] uppercase shadow-inner">
+                              {adm.fullName.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-gray-800 leading-tight">{adm.fullName}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-tighter">
+                                  {adm.role === 'port' ? '🚢 Port' : '🚐 Terminal'}
+                                </p>
+                                <span className="text-[8px] text-gray-300">•</span>
+                                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">ID: {adm.id}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                             <div className="flex flex-col items-end">
+                               <span className="text-[9px] font-mono font-bold text-gray-300 block mb-1">PIN: ****</span>
+                               <button 
+                                 onClick={() => handleRejectAdmin(adm.id, adm.fullName)}
+                                 className="opacity-0 group-hover:opacity-100 text-[8px] text-rose-500 font-black uppercase hover:underline transition-opacity"
+                               >
+                                 Suspend
+                               </button>
+                             </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* 1. HORIZONTALLY SCROLLABLE SUMMARY CARDS */}
       <div className="flex gap-4 overflow-x-auto pb-3 hide-scrollbar snap-x snap-mandatory">

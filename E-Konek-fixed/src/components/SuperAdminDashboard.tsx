@@ -1,0 +1,728 @@
+import React, { useState, useEffect } from 'react';
+import { fsUpdate, fsAdd, COLLECTIONS } from '../lib/firebase';
+import { Panel1 } from '../features/montenegro/Panel1';
+import { Panel2 } from '../features/land/Panel2';
+import { Panel3 } from '../features/passenger/Panel3';
+import { useApp } from '../context/AppContext';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+
+export const SuperAdminDashboard = () => {
+  const {
+    currentRole,
+    setCurrentRole,
+    isAuthenticated,
+    setIsAuthenticated,
+    isOnline,
+    toastMessage,
+    setToastMessage,
+    transactions,
+    setTransactions,
+    payoutHistory,
+    setPayoutHistory,
+    auditLog,
+    setAuditLog,
+    formatPST
+  } = useApp();
+
+  const navigate = useNavigate();
+
+  // Super Admin panel selection
+  const [adminActiveTab, setAdminActiveTab] = useState<number>(0);
+
+  // In-line Super Admin logouts confirmations
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+
+  // Redirect if unauthorized
+  useEffect(() => {
+    if (!isAuthenticated || !currentRole) {
+      navigate('/');
+    }
+  }, [isAuthenticated, currentRole, navigate]);
+
+  // Toast Auto-Dismiss Trigger
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage, setToastMessage]);
+
+  const handleLogoutAction = () => {
+    // Record audit logout log
+    setAuditLog(prev => [{
+      timestamp: new Date().toISOString(),
+      role: currentRole as any,
+      action: 'logout'
+    }, ...prev]);
+
+    // Reset session states
+    setCurrentRole(null);
+    setIsAuthenticated(false);
+    navigate('/');
+  };
+
+  if (!isAuthenticated || !currentRole) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F0F4F8] flex flex-col relative pb-[64px] sm:pb-0">
+      
+      {/* Subtle Mamburao, Occidental Mindoro Flag Background Watermark */}
+      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.07] select-none">
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/e/e6/Flag_of_Mamburao%2C_Occidental_Mindoro.png" 
+          alt="Mamburao, Occidental Mindoro Flag" 
+          className="w-full max-w-4xl max-h-[80vh] object-contain"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+      
+      {/* 1. PERSISTENT TOP STATUS BAR (28px) */}
+      <div
+        className={`fixed top-0 left-0 right-0 h-[28px] z-[100] text-white text-xs font-bold leading-[28px] text-center transition-colors duration-500 shadow-sm ${
+          isOnline ? 'bg-emerald-600' : 'bg-red-600 animate-pulse'
+        }`}
+      >
+        {isOnline ? '🟢 Online — Live Data' : '🔴 Offline — Cached Mode'}
+      </div>
+
+      {/* Adjust container padding-top for the 28px height status bar */}
+      <div className="pt-[28px] flex-1 flex flex-col">
+        
+        {/* VIEW SCHEME: PORT STAFF */}
+        {currentRole === 'port' && (
+          <div className="flex-1 flex flex-col">
+            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-xs">
+              <span className="font-extrabold text-[#003580] tracking-tight text-sm">Abra Port Station</span>
+              <button
+                onClick={handleLogoutAction}
+                className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+              >
+                Logout 🚢
+              </button>
+            </header>
+            <div className="flex-1">
+              <Panel1 isSuperAdmin={false} />
+            </div>
+          </div>
+        )}
+
+        {/* VIEW SCHEME: TERMINAL STAFF */}
+        {currentRole === 'terminal' && (
+          <div className="flex-1 flex flex-col">
+            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-xs">
+              <span className="font-extrabold text-[#003580] tracking-tight text-sm">Mamburao dispatch Panel</span>
+              <button
+                onClick={handleLogoutAction}
+                className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+              >
+                Logout 🚐
+              </button>
+            </header>
+            <div className="flex-1">
+              <Panel2 isSuperAdmin={false} />
+            </div>
+          </div>
+        )}
+
+        {/* VIEW SCHEME: PASSENGER PORTAL */}
+        {currentRole === 'passenger' && (
+          <div className="flex-1 flex flex-col">
+            <header className="bg-transparent py-3 px-6 flex justify-between items-center z-10">
+              <span className="text-[10px] uppercase font-black tracking-widest text-[#003580]/50 font-sans">Public Station Access</span>
+              <button
+                onClick={handleLogoutAction}
+                className="text-xs text-[#003580] font-black hover:text-red-500 transition cursor-pointer"
+              >
+                Exit Portal
+              </button>
+            </header>
+            <div className="flex-1">
+              <Panel3 isSuperAdmin={false} />
+            </div>
+          </div>
+        )}
+
+        {/* VIEW SCHEME: SUPER ADMIN ROUTER */}
+        {currentRole === 'superadmin' && (
+          <div className="flex-1 flex flex-col">
+            
+            {/* Topbar for Admin */}
+            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#FF6B00] text-white font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded">ADMIN MODE</span>
+                <span className="font-bold text-sm text-gray-500 font-sans">E-Transit Hub</span>
+              </div>
+
+              {/* Secure Confirm Logout */}
+              <div>
+                {!showConfirmLogout ? (
+                  <button
+                    onClick={() => setShowConfirmLogout(true)}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                  >
+                    🔐 Logout
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-red-50 p-1.5 rounded-xl border border-red-200">
+                    <span className="text-[10px] font-bold text-red-700 font-mono pl-1.5">Are you sure?</span>
+                    <button
+                      onClick={handleLogoutAction}
+                      className="bg-red-600 text-white font-bold text-[10px] px-2.5 py-1 rounded-lg hover:bg-red-700 cursor-pointer"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setShowConfirmLogout(false)}
+                      className="bg-gray-200 text-gray-700 font-bold text-[10px] px-2.5 py-1 rounded-lg hover:bg-gray-300 cursor-pointer"
+                    >
+                      No
+                    </button>
+                  </div>
+                )}
+              </div>
+            </header>
+
+            {/* Active Switcher Section */}
+            <div className="flex-1 pb-[64px] overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={adminActiveTab}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="w-full h-full"
+                >
+                  {adminActiveTab === 0 && <Panel1 isSuperAdmin={true} />}
+                  {adminActiveTab === 1 && <Panel2 isSuperAdmin={true} />}
+                  {adminActiveTab === 2 && <Panel3 isSuperAdmin={true} />}
+                  {adminActiveTab === 3 && <AdminReportSectionPanel4 />}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* FIXED BOTTOM NAV BAR (z-index 50) */}
+            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-[64px] z-50 flex justify-around items-center px-4 shadow-lg">
+              <button
+                onClick={() => setAdminActiveTab(0)}
+                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
+                  adminActiveTab === 0
+                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
+                    : 'text-gray-400 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">🚢</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Port</span>
+              </button>
+
+              <button
+                onClick={() => setAdminActiveTab(1)}
+                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
+                  adminActiveTab === 1
+                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
+                    : 'text-gray-400 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">🚐</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Terminal</span>
+              </button>
+
+              <button
+                onClick={() => setAdminActiveTab(2)}
+                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
+                  adminActiveTab === 2
+                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
+                    : 'text-gray-400 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">👤</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Passenger</span>
+              </button>
+
+              <button
+                onClick={() => setAdminActiveTab(3)}
+                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
+                  adminActiveTab === 3
+                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
+                    : 'text-gray-400 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">🔐</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-sans mt-0.5">Admin</span>
+              </button>
+            </nav>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* TOAST PANEL (appears bottom-center, slides up) */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#00A651] text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-2xl z-[9999] flex items-center justify-center gap-2.5 border border-green-500 animate-slide-up">
+          <span className="text-sm">🔔</span>
+          <span className="text-xs uppercase tracking-wider">{toastMessage}</span>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+// =============================================================================
+// SUB COMPONENT: ADMIN REPORT SECTION PANEL 4 (Only for Super Admin)
+// =============================================================================
+const AdminReportSectionPanel4 = () => {
+  const {
+    transactions,
+    setTransactions,
+    payoutHistory,
+    setPayoutHistory,
+    auditLog,
+    formatPST
+  } = useApp();
+
+  // Search/Filter states
+  const [filterType, setFilterType] = useState('All');
+  const [filterPeriod, setFilterPeriod] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Audit list folding state
+  const [auditOpen, setAuditOpen] = useState(false);
+
+  // Financial statistics calculations
+  const completedTx = transactions.filter(t => t.status === 'Completed');
+
+  const totalCommissions = completedTx.reduce((acc, t) => acc + t.commissionAmount, 0);
+  const totalTransactionsCount = completedTx.length;
+  const ferryCommissions = completedTx.filter(t => t.type === 'Ferry').reduce((acc, t) => acc + t.commissionAmount, 0);
+  const landCommissions = completedTx.filter(t => t.type === 'Van' || t.type === 'Bus').reduce((acc, t) => acc + t.commissionAmount, 0);
+  const totalGrossRevenue = completedTx.reduce((acc, t) => acc + t.grossAmount, 0);
+  const pendingPayout = completedTx.filter(t => !t.paid).reduce((acc, t) => acc + t.commissionAmount, 0);
+
+  // Filters calculation
+  const getFilteredTransactions = () => {
+    return transactions.filter(t => {
+      const typeMatches = filterType === 'All' || t.type === filterType;
+      
+      const statusMatches = filterStatus === 'All' || t.status === filterStatus;
+      
+      const searchMatches = t.passengerName.toLowerCase().includes(searchQuery.toLowerCase()) || t.id.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      let periodMatches = true;
+      if (filterPeriod === 'Today') {
+        const startOfToday = new Date().setHours(0,0,0,0);
+        periodMatches = new Date(t.timestamp).getTime() >= startOfToday;
+      } else if (filterPeriod === 'Week') {
+        const startOfWeek = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
+        periodMatches = new Date(t.timestamp).getTime() >= startOfWeek;
+      }
+
+      return typeMatches && statusMatches && searchMatches && periodMatches;
+    });
+  };
+
+  const filteredList = getFilteredTransactions();
+
+  // Refund handler
+  const handleRefund = (txId: string) => {
+    if (confirm("Are you sure you want to REFUND this ticket transaction? This action will reverse commissions.")) {
+      setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'Refunded' } : t));
+      fsUpdate(COLLECTIONS.transactions, txId, { status: 'Refunded' }).catch(console.error);
+    }
+  };
+
+  // Payout processing
+  const handleMarkAllAsPaid = () => {
+    const unpaidList = completedTx.filter(t => !t.paid);
+    if (unpaidList.length === 0) return alert("No outstanding pending payouts to settle.");
+
+    const totalPaid = unpaidList.reduce((acc, t) => acc + t.commissionAmount, 0);
+    const count = unpaidList.length;
+
+    // Set paid true on state + Firestore
+    setTransactions(prev => prev.map(t => t.status === 'Completed' ? { ...t, paid: true } : t));
+    unpaidList.forEach(t => fsUpdate(COLLECTIONS.transactions, t.id, { paid: true }).catch(console.error));
+
+    // Log payout event
+    const newPayout = {
+      id: 'ph-' + Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      totalAmount: totalPaid,
+      transactionCount: count
+    };
+
+    setPayoutHistory(prev => [newPayout, ...prev]);
+    fsAdd(COLLECTIONS.payoutHistory, newPayout).catch(console.error);
+    alert(`Successfully processed payout for ₱${totalPaid} across ${count} completion logs!`);
+  };
+
+  // CSV Generator blob builder
+  const handleExportCSV = () => {
+    const columns = ["Timestamp", "Ref ID", "Passenger", "Route", "Type", "Gross Amount (PHP)", "Commission (PHP)", "Confirmed By", "Status"];
+    
+    const rows = getFilteredTransactions().map(t => [
+      formatPST(t.timestamp),
+      t.id,
+      t.passengerName,
+      t.route,
+      t.type,
+      t.grossAmount,
+      t.commissionAmount,
+      t.confirmedBy,
+      t.status
+    ]);
+
+    const csvContent = [
+      columns.join(","),
+      ...rows.map(e => e.map(val => `"${val}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `EKonek_OcciMindoTransit_Admin_Export_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSS Chart widths percentage
+  const totalCommGraph = Math.max(1, ferryCommissions + landCommissions);
+  const busCommissions = completedTx.filter(t => t.type === 'Bus').reduce((acc, t) => acc + t.commissionAmount, 0);
+  const vanCommsVal = completedTx.filter(t => t.type === 'Van').reduce((acc, t) => acc + t.commissionAmount, 0);
+
+  const ferryPct = Math.round((ferryCommissions / totalCommGraph) * 100);
+  const vanPct = Math.round((vanCommsVal / totalCommGraph) * 100);
+  const busPct = Math.round((busCommissions / totalCommGraph) * 100);
+
+  return (
+    <div className="p-6 space-y-8 animate-fade-in text-[#2D3748]">
+      
+      <div>
+        <h1 className="text-2xl font-black text-[#003580] tracking-tight font-sans">🛡️ Super Admin Control and Financial Console</h1>
+        <p className="text-gray-500 text-xs mt-0.5">Review transit commission margins, payroll payouts, log audits, and system registries.</p>
+      </div>
+
+      {/* 1. HORIZONTALLY SCROLLABLE SUMMARY CARDS */}
+      <div className="flex gap-4 overflow-x-auto pb-3 hide-scrollbar snap-x snap-mandatory">
+        
+        <div className="min-w-[220px] bg-white p-5 rounded-2xl border border-gray-100 shadow-sm snap-start flex-1 shrink-0 flex flex-col justify-between">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gross Commissions</p>
+          <div>
+            <p className="text-2xl font-black text-[#003580] leading-none">₱{totalCommissions}</p>
+            <p className="text-[10px] text-gray-400 mt-1.5 font-bold uppercase">{totalTransactionsCount} total sales log</p>
+          </div>
+        </div>
+
+        <div className="min-w-[220px] bg-white p-5 rounded-2xl border border-gray-100 shadow-sm snap-start flex-1 shrink-0 flex flex-col justify-between">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ferry Commissions</p>
+          <div>
+            <p className="text-2xl font-black text-indigo-600 leading-none">₱{ferryCommissions}</p>
+            <p className="text-[10px] text-gray-400 mt-1.5 font-bold uppercase">Abra Port Share</p>
+          </div>
+        </div>
+
+        <div className="min-w-[220px] bg-white p-5 rounded-2xl border border-gray-100 shadow-sm snap-start flex-1 shrink-0 flex flex-col justify-between">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Van & Bus Commissions</p>
+          <div>
+            <p className="text-2xl font-black text-[#FF6B00] leading-none">₱{landCommissions}</p>
+            <p className="text-[10px] text-gray-400 mt-1.5 font-bold uppercase">Mamburao dispatch Share</p>
+          </div>
+        </div>
+
+        <div className="min-w-[220px] bg-white p-5 rounded-2xl border border-gray-100 shadow-sm snap-start flex-1 shrink-0 flex flex-col justify-between">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Gross Ticket sales</p>
+          <div>
+            <p className="text-2xl font-black text-emerald-600 leading-none">₱{totalGrossRevenue}</p>
+            <p className="text-[10px] text-gray-400 mt-1.5 font-bold uppercase">Gross Philippine PST Sale</p>
+          </div>
+        </div>
+
+        <div className="min-w-[220px] bg-[#002150] text-white p-5 rounded-2xl shadow snap-start flex-1 shrink-0 flex flex-col justify-between border border-transparent">
+          <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Pending Payout</p>
+          <div>
+            <p className="text-2xl font-black text-[#FF6B00] leading-none font-mono">₱{pendingPayout}</p>
+            <p className="text-[10px] text-white/40 mt-1.5 font-bold uppercase">Unsettled Commissions</p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 2. CUSTOM CSS BAR CHART (Zero chart JS libraries!) */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <h3 className="font-bold text-sm text-[#003580] uppercase tracking-wider">📊 Commissions Allocation Ratio breakdown</h3>
+        
+        <div className="space-y-4 pt-1">
+          {/* Ferry Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs font-bold text-gray-700">
+              <span className="flex items-center gap-1.5">🚢 Ferry (Montenegro Lines)</span>
+              <span>₱{ferryCommissions} ({ferryPct}%)</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+              <div
+                className="bg-[#003580] h-full rounded-full transition-all duration-300 min-w-[4px]"
+                style={{ width: `${Math.max(4, ferryPct)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Van Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs font-bold text-gray-700">
+              <span className="flex items-center gap-1.5">🚐 Van Shuttles</span>
+              <span>₱{vanCommsVal} ({vanPct}%)</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+              <div
+                className="bg-[#FF6B00] h-full rounded-full transition-all duration-300 min-w-[4px]"
+                style={{ width: `${Math.max(4, vanPct)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Bus Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs font-bold text-gray-700">
+              <span className="flex items-center gap-1.5">🚌 Bus Shuttles</span>
+              <span>₱{busCommissions} ({busPct}%)</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+              <div
+                className="bg-teal-500 h-full rounded-full transition-all duration-300 min-w-[4px]"
+                style={{ width: `${Math.max(4, busPct)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. TRANSACTION LOG REPORT SECTION WITH REFUND */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+          <h2 className="text-lg font-black text-[#003580] font-sans">📋 Transaction Auditing Database</h2>
+          <button
+            onClick={handleExportCSV}
+            className="self-start sm:self-auto bg-teal-600 hover:bg-teal-700 text-white text-xs font-black px-4.5 py-2.5 rounded-xl shadow cursor-pointer transition flex items-center gap-2"
+          >
+            📥 Export report (CSV)
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs">
+          <div>
+            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1.5">Search Name / Ref</label>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-gray-100 rounded-lg px-2.5 py-2 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1.5">Transport Type</label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="w-full bg-white border border-gray-100 rounded-lg px-2 py-2 focus:outline-none"
+            >
+              <option value="All">All Types</option>
+              <option value="Ferry">Ferry Only</option>
+              <option value="Van">Van Only</option>
+              <option value="Bus">Bus Only</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1.5">Reporting Window</label>
+            <select
+              value={filterPeriod}
+              onChange={(e) => setFilterPeriod(e.target.value)}
+              className="w-full bg-white border border-gray-100 rounded-lg px-2 py-2 focus:outline-none"
+            >
+              <option value="All">All History</option>
+              <option value="Today">Today Only</option>
+              <option value="Week">This Week</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1.5">Sales Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full bg-white border border-gray-100 rounded-lg px-2 py-2 focus:outline-none"
+            >
+              <option value="All">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Refunded">Refunded</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Table representation */}
+        <div className="overflow-x-auto text-sm">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="border-b border-gray-150 text-[10px] text-gray-400 uppercase tracking-widest font-extrabold pb-3">
+                <th className="py-2.5">Date (PST)</th>
+                <th className="py-2.5">Ticket REF</th>
+                <th className="py-2.5">Passenger</th>
+                <th className="py-2.5">Transit Route Details</th>
+                <th className="py-2.5">Rate allocation</th>
+                <th className="py-2.5">Gross (₱)</th>
+                <th className="py-2.5 text-orange-600">Commission (₱)</th>
+                <th className="py-2.5">Confirmed By</th>
+                <th className="py-2.5 text-center">Status</th>
+                <th className="py-2.5 text-right no-print">Refund</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredList.map((t) => (
+                <tr
+                  key={t.id}
+                  className={`hover:bg-gray-50/50 ${
+                    t.status === 'Completed' ? 'bg-green-50/15' : 'bg-red-50/30'
+                  }`}
+                >
+                  <td className="py-3.5 font-mono text-[10px] font-semibold text-gray-500">{formatPST(t.timestamp)}</td>
+                  <td className="py-3.5 font-mono text-[10px] font-bold text-blue-900">#{t.id.toUpperCase()}</td>
+                  <td className="py-3.5 font-semibold text-gray-800 text-xs">{t.passengerName}</td>
+                  <td className="py-3.5 text-gray-500 text-xs font-medium">
+                    <div>{t.route}</div>
+                    <span className="text-[9px] font-bold text-indigo-400 font-mono uppercase bg-indigo-50 px-1 py-0.2 rounded mt-1.5 inline-block">{t.type}</span>
+                  </td>
+                  <td className="py-3.5 text-xs text-slate-800 italic">{t.ticketType}</td>
+                  <td className="py-3.5 font-bold text-gray-700 text-xs">₱{t.grossAmount}</td>
+                  <td className="py-3.5 font-bold text-orange-600 text-xs">₱{t.commissionAmount}</td>
+                  <td className="py-3.5 text-gray-500 text-xs font-semibold">{t.confirmedBy}</td>
+                  <td className="py-3.5 text-center">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-red-155 text-red-600 bg-red-50 border border-red-200'
+                    }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 text-right no-print">
+                    {t.status === 'Completed' ? (
+                      <button
+                        onClick={() => handleRefund(t.id)}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[10px] px-2.5 py-1 rounded-lg transition"
+                      >
+                        Refund
+                      </button>
+                    ) : (
+                      <span className="text-red-500 text-xs font-extrabold italic font-serif">Refunded</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              
+              {/* RUNNING TOTAL ROW */}
+              <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-900 border-b">
+                <td colSpan={5} className="py-3 pl-3 text-right uppercase text-xs font-extrabold tracking-widest text-[#003580]">
+                  Running sum total:
+                </td>
+                <td className="py-3 text-xs">
+                  ₱{filteredList.filter(t => t.status === 'Completed').reduce((acc, b) => acc + b.grossAmount, 0)}
+                </td>
+                <td className="py-3 text-xs text-orange-600">
+                  ₱{filteredList.filter(t => t.status === 'Completed').reduce((acc, b) => acc + b.commissionAmount, 0)}
+                </td>
+                <td colSpan={3} className="py-3"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. PAYOUT MANAGER */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-black text-[#003580] font-sans">💳 Settlement & Commission Payouts</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Disburse earned funds and outstanding balances to transit station operators.</p>
+          </div>
+          <button
+            onClick={handleMarkAllAsPaid}
+            className="w-full sm:w-auto bg-[#00A651] hover:bg-green-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow transition cursor-pointer"
+          >
+            Mark All as Paid (Settle ₱{pendingPayout})
+          </button>
+        </div>
+
+        {/* Payout list histories */}
+        <div className="space-y-3 pt-2">
+          <h4 className="text-xs font-extrabold text-[#003580] uppercase tracking-wider">Settlement Disbursal Log Journal</h4>
+          
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+            {payoutHistory.length === 0 ? (
+              <p className="p-4 text-center text-xs text-gray-400">No disbursements recorded yet.</p>
+            ) : (
+              payoutHistory.map((ph, idx) => (
+                <div key={ph.id || idx} className="bg-white p-4 flex justify-between items-center text-xs">
+                  <div className="space-y-1">
+                    <p className="font-extrabold text-[#003580]">{formatPST(ph.date)}</p>
+                    <p className="text-gray-400 font-sans tracking-wide">Processed payout settlement journal entry: {ph.id}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-green-600">₱{ph.totalAmount}</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">{ph.transactionCount} bookings settled</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. ROLE AUDIT LOG SECTION */}
+      <div className="bg-slate-800 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
+        <button
+          onClick={() => setAuditOpen(!auditOpen)}
+          className="w-full p-5 bg-slate-900 hover:bg-slate-950 font-sans font-black text-xs text-white uppercase tracking-widest text-left flex justify-between items-center cursor-pointer focus:outline-none"
+        >
+          <span className="flex items-center gap-2">🔐 System Audit Event logging</span>
+          <span>{auditOpen ? '▲ Hide Log' : '▼ Expand Audit Log'}</span>
+        </button>
+
+        {auditOpen && (
+          <div className="p-5 max-h-72 overflow-y-auto space-y-2 pr-2 scrollbar-thin text-slate-300">
+            {auditLog.map((audit, idx) => (
+              <div key={idx} className="bg-slate-900 border-l-2 border-orange-500/80 p-3 rounded-r-xl flex justify-between items-center text-xs">
+                <div>
+                  <span className="font-bold text-white capitalize mr-2">
+                    {audit.role === 'superadmin' ? '🔐 Super Admin' : 
+                     audit.role === 'port' ? '🚢 Port Staff' :
+                     audit.role === 'terminal' ? '🚐 Terminal Staff' : '👤 Passenger'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                    audit.action === 'login' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-900'
+                  }`}>
+                    {audit.action.toUpperCase()}
+                  </span>
+                </div>
+                <div className="font-mono text-[10px] text-slate-400">
+                  {formatPST(audit.timestamp)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};

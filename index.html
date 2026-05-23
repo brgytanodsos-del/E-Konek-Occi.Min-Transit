@@ -9,37 +9,16 @@
     <!-- Leaflet Map CSS and JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <!-- PWA Link and Service Worker Registration -->
+    <link rel="manifest" href="/manifest.json" />
     <script>
-      (function() {
-        // Manifest
-        const manifest = {
-          name: "E-Konek Occi.Mindo Transit",
-          short_name: "E-Konek Transit",
-          start_url: ".",
-          display: "standalone",
-          theme_color: "#003580",
-          background_color: "#F0F4F8"
-        };
-        const stringManifest = JSON.stringify(manifest);
-        const blob = new Blob([stringManifest], {type: 'application/json'});
-        const manifestURL = URL.createObjectURL(blob);
-        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
-        
-        // Service Worker with secure context and existence guards
-        const swCode = `
-          const CACHE_NAME = 'mindorotransit-v1';
-          self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE_NAME)));
-          self.addEventListener('fetch', (e) => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-        `;
-        const swBlob = new Blob([swCode], {type: 'application/javascript'});
-        const swURL = URL.createObjectURL(swBlob);
-        
-        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.register(swURL).catch(function(err) {
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(function(err) {
             console.warn('Service worker registration bypassed/ignored:', err);
           });
-        }
-      })();
+        });
+      }
     </script>
   </head>
   <body>

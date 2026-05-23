@@ -19,7 +19,13 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     addTransaction,
     abraWeather,
     isOnline,
-    formatPST
+    formatPST,
+    setToastMessage,
+    persistShip,
+    persistAnnouncement,
+    updateShipStatus: persistShipStatus,
+    updateBookingStatus,
+    userAccounts,
   } = useApp();
 
   // Create voyages state
@@ -36,6 +42,9 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
   // Local AI Voice Synthesis States
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>('feminine');
   const [speakingNoticeId, setSpeakingNoticeId] = useState<string | null>(null);
+  
+  // Custom double-tap cancellation state (non-blocking)
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
 
   // Stop active PA voice broadcast if staff component departs
   useEffect(() => {
@@ -54,16 +63,20 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
 
   // Stats
   const ticketsSoldToday = ferryBookings.filter(b => b.status === 'Confirmed').length;
-  const boardedCount = ferryBookings.filter(b => b.status === 'Boarded').length; // simple simulation count
+  const boardedCount = ferryBookings.filter(b => b.status === 'Boarded').length; 
   const upcomingDepartures = ships.filter(s => s.status === 'Scheduled' || s.status === 'Boarding').length;
   const totalSlots = ships.reduce((acc, s) => acc + s.available, 0);
 
   // Status options for dropdown
   const SHIP_STATUSES = ['Scheduled', 'Boarding', 'Departed', 'Delayed', 'Cancelled'];
 
-  const handleCreateVoyage = (e: React.FormEvent) => {
+  const handleCreateVoyage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vesselName || !depDateTime || !arrDateTime) return alert("Please fill all fields");
+    if (!vesselName || !depDateTime || !arrDateTime) {
+      setToastMessage("⚠️ Please fill in all fields.");
+      setTimeout(() => setToastMessage(null), 3500);
+      return;
+    }
 
     const newShipObj = {
       id: 's-' + Math.random().toString(36).substr(2, 9),
@@ -78,16 +91,20 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     };
 
     setShips(prev => [...prev, newShipObj]);
+    persistShip(newShipObj).catch(console.error);
+
     setVesselName('');
     setDepDateTime('');
     setArrDateTime('');
+    setToastMessage("🚢 Voyage scheduled successfully!");
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const updateShipStatus = (shipId: string, status: string) => {
     setShips(prev => prev.map(s => s.id === shipId ? { ...s, status } : s));
+    persistShipStatus(shipId, status).catch(console.error);
   };
 
-  // Add Notice
   const handleAddNotice = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNotice.trim()) return;
@@ -99,28 +116,28 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       author: authorName
     };
     setAnnouncements(prev => [notice, ...prev]);
+    persistAnnouncement(notice).catch(console.error);
     setNewNotice('');
+    setToastMessage("📢 Announcement posted successfully!");
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Booking actions
   const handleConfirmBooking = (booking: any) => {
-    // Update booking state
     setFerryBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Confirmed' } : b));
-    
-    // Auto generate Transaction Log
+    updateBookingStatus('ferryBookings', booking.id, 'Confirmed').catch(console.error);
     addTransaction(booking, 'Port Admin');
-
-    // Display Toast/Notification
-    alert(`Booking for ${booking.name} is successfully CONFIRMED!`);
+    setToastMessage(`✅ Booking for ${booking.name} is successfully CONFIRMED!`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleCancelBooking = (bookingId: string) => {
-    if (confirm("Are you sure you want to cancel this booking?")) {
-      setFerryBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    }
+    setFerryBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
+    updateBookingStatus('ferryBookings', bookingId, 'Cancelled').catch(console.error);
+    setToastMessage(`❌ Booking has been cancelled.`);
+    setTimeout(() => setToastMessage(null), 3505);
+    setConfirmingCancelId(null);
   };
 
-  // Filter Bookings
   const filteredBookings = ferryBookings.filter(b => {
     const ship = ships.find(s => s.id === b.shipId);
     const shipRoute = ship ? ship.route : '';
@@ -130,19 +147,13 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     return nameMatches && routeMatches && statusMatches;
   });
 
-  // Wind warning
   const isHighWind = abraWeather && abraWeather.windspeed_10m > 30;
 
   return (
     <div className="p-6 space-y-8 animate-fade-in text-slate-800">
-      
-      {/* Wind warning alert */}
       {isHighWind && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-600 text-white px-6 py-4 rounded-3xl shadow-lg border-2 border-red-500 animate-pulse flex items-center justify-between gap-4"
-        >
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-red-600 text-white px-6 py-4 rounded-3xl shadow-lg border-2 border-red-500 animate-pulse flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-3xl">⚠️</span>
             <div>
@@ -153,122 +164,56 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
         </motion.div>
       )}
 
-      {/* Corporate Header & Ship Hull Decoration Banner Component */}
       <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-150 shadow-sm">
-        {/* UPPER WHITE CABIN & LOGO AREA */}
         <div className="p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              {/* MSLI Style Anchor Logo design element */}
               <div className="bg-[#009E49] text-[#FFD700] p-1.5 rounded-lg border border-yellow-400 flex items-center justify-center font-bold text-xs shadow-sm">
                 <i className="fa-solid fa-anchor mr-1"></i> MSLI
               </div>
-              <span className="bg-[#003087] text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">
-                Abra Ticket Desk
-              </span>
-              {isSuperAdmin && (
-                <span className="bg-[#FF8800] text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">
-                  System Admin
-                </span>
-              )}
+              <span className="bg-[#003087] text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">Abra Ticket Desk</span>
+              {isSuperAdmin && <span className="bg-[#FF8800] text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">System Admin</span>}
             </div>
-            
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#009E49] tracking-tighter uppercase font-sans">
-                MONTENEGRO
-              </span>
-              <span className="text-2xl font-serif italic text-red-600 font-extrabold tracking-tight">
-                Lines
-              </span>
+              <span className="text-3xl font-black text-[#009E49] tracking-tighter uppercase font-sans">MONTENEGRO</span>
+              <span className="text-2xl font-serif italic text-red-600 font-extrabold tracking-tight">Lines</span>
             </div>
-            <p className="text-slate-500 text-xs sm:text-sm font-semibold mt-1">
-              Official Abra de Ilog - Batangas RoRo & Fast Craft Ticketing hub
-            </p>
+            <p className="text-slate-500 text-xs sm:text-sm font-semibold mt-1">Official Abra de Ilog - Batangas RoRo & Fast Craft Ticketing hub</p>
           </div>
-
           <div className="w-full md:w-auto shrink-0">
-            <WeatherWidget
-              weatherData={abraWeather}
-              title="Abra Port Weather"
-              lastUpdated={abraWeather ? formatPST(abraWeather.lastUpdated) : ''}
-              isOnline={isOnline}
-            />
+            <WeatherWidget weatherData={abraWeather} title="Abra Port Weather" lastUpdated={abraWeather ? formatPST(abraWeather.lastUpdated) : ''} isOnline={isOnline} />
           </div>
         </div>
-
-        {/* WATERLINE ACCENT STRIPES (Yellow gold + Red fine lines) */}
-        <div className="h-2 bg-[#FFD700] relative w-full overflow-hidden">
-          <div className="h-0.5 bg-red-600 w-full absolute top-0" />
-        </div>
-
-        {/* LOWER DEEP EMERALD HULL COLOR ROW */}
+        <div className="h-2 bg-[#FFD700] relative w-full overflow-hidden"><div className="h-0.5 bg-red-600 w-full absolute top-0" /></div>
         <div className="bg-[#009E49] px-6 py-2.5 flex justify-between items-center text-white/90 text-xs font-semibold">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping inline-block" />
-            <span>M/V Maria Series Operational Panel</span>
-          </div>
-          <p className="text-[10px] uppercase font-bold tracking-widest text-[#FFD700]">
-            "We take care of you"
-          </p>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping inline-block" /><span>M/V Maria Series Operational Panel</span></div>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-[#FFD700]">"We take care of you"</p>
         </div>
       </div>
 
-      {/* Quick Stats Grid - Enhanced Montenegro Colors */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div 
-          whileHover={{ y: -3, scale: 1.01 }}
-          className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between"
-        >
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Tickets Issued</p>
-          <div className="flex items-baseline justify-between mt-2">
-            <p className="text-3xl font-black text-[#003087]">{ticketsSoldToday}</p>
-            <span className="text-[#003087]/20 p-2 rounded-xl bg-slate-50"><i className="fa-solid fa-ticket text-xl"></i></span>
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          whileHover={{ y: -3, scale: 1.01 }}
-          className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between"
-        >
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Boarded Passengers</p>
-          <div className="flex items-baseline justify-between mt-2">
-            <p className="text-3xl font-black text-[#009E49]">{boardedCount || 42}</p>
-            <span className="text-[#009E49]/20 p-2 rounded-xl bg-slate-50"><i className="fa-solid fa-clipboard-user text-xl"></i></span>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          whileHover={{ y: -3, scale: 1.01 }}
-          className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between"
-        >
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Live Voyages</p>
-          <div className="flex items-baseline justify-between mt-2">
-            <p className="text-3xl font-black text-[#FF8800]">{upcomingDepartures}</p>
-            <span className="text-[#FF8800]/20 p-2 rounded-xl bg-slate-50"><i className="fa-solid fa-dharmachakra text-xl"></i></span>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          whileHover={{ y: -3, scale: 1.01 }}
-          className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between"
-        >
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Available Capacity</p>
-          <div className="flex items-baseline justify-between mt-2">
-            <p className="text-3xl font-black text-[#00A651]">{totalSlots}</p>
-            <span className="text-[#00A651]/20 p-2 rounded-xl bg-slate-50"><i className="fa-solid fa-users text-xl"></i></span>
-          </div>
-        </motion.div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative">
+        {[
+          { label: 'Tickets Issued', val: ticketsSoldToday, color: '#003087', icon: 'fa-ticket' },
+          { label: 'Boarded Passengers', val: boardedCount || 42, color: '#009E49', icon: 'fa-clipboard-user' },
+          { label: 'Live Voyages', val: upcomingDepartures, color: '#FF8800', icon: 'fa-dharmachakra' },
+          { label: 'Available Capacity', val: totalSlots, color: '#00A651', icon: 'fa-users' }
+        ].map((stat, i) => (
+          <motion.div key={i} whileHover={{ y: -3, scale: 1.01 }} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between">
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{stat.label}</p>
+            <div className="flex items-baseline justify-between mt-2">
+              <p className="text-3xl font-black" style={{ color: stat.color }}>{stat.val}</p>
+              <span className="p-2 rounded-xl bg-slate-50" style={{ color: `${stat.color}40` }}><i className={`fa-solid ${stat.icon} text-xl`}></i></span>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Scheduling & Adding Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Voyage Departure Board */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4 relative z-10 overflow-hidden">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3 relative z-10">
             <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
               <span className="text-[#009E49]"><i className="fa-solid fa-ship"></i></span>
-              Montenegro Lines Vessel Status Board
+              Vessel Status Board
             </h2>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -278,7 +223,6 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
               <span className="text-[10px] font-black uppercase tracking-widest text-[#009E49] bg-[#009E49]/10 py-0.5 px-2 rounded-full">REALTIME</span>
             </div>
           </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[500px]">
               <thead>
@@ -294,34 +238,21 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                 {ships.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-4">
-                      <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
-                        <span className="text-[#009E49]"><i className="fa-solid fa-ship-laughing text-sm"></i></span>
-                        {s.name}
-                      </div>
-                      <span className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md mt-1 font-mono">
-                        {s.type} Class
-                      </span>
+                      <div className="font-extrabold text-slate-800 flex items-center gap-1.5"><span className="text-[#009E49]"><i className="fa-solid fa-ship-laughing text-sm"></i></span>{s.name}</div>
+                      <span className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md mt-1 font-mono">{s.type} Class</span>
                     </td>
                     <td className="py-4 text-slate-600 font-semibold">{s.route}</td>
                     <td className="py-4 font-mono text-xs text-slate-500 font-semibold">{formatPST(s.depTime)}</td>
                     <td className="py-4 text-center">
                       <div className="font-black text-slate-800">{s.available}</div>
                       <div className="w-16 mx-auto bg-slate-100 rounded-full h-1 overflow-hidden mt-1.5 border border-slate-200">
-                        <div 
-                          className="bg-[#009E49] h-full" 
-                          style={{ width: `${Math.min(100, (s.available / s.capacity) * 105)}%` }} 
-                        />
+                        <div className="bg-[#009E49] h-full" style={{ width: `${Math.min(100, (s.available / s.capacity) * 105)}%` }} />
                       </div>
                     </td>
                     <td className="py-4">
-                      <select
-                        value={s.status}
-                        onChange={(e) => updateShipStatus(s.id, e.target.value)}
-                        className="bg-slate-150 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-black px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#009E49] transition-all cursor-pointer shadow-sm"
-                      >
-                        {SHIP_STATUSES.map(stat => (
-                          <option key={stat} value={stat}>{stat}</option>
-                        ))}
+                      <select value={s.status} onChange={(e) => updateShipStatus(s.id, e.target.value)}
+                        className="bg-slate-150 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-black px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#009E49] transition-all cursor-pointer shadow-sm">
+                        {SHIP_STATUSES.map(stat => <option key={stat} value={stat}>{stat}</option>)}
                       </select>
                     </td>
                   </tr>
@@ -331,448 +262,197 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
           </div>
         </div>
 
-        {/* Add Voyage Schedule Form with Montenegro styling */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div>
-            <h2 className="text-lg font-black text-[#003087] tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
-              <span className="text-[#FF8800]"><i className="fa-solid fa-plus-circle"></i></span>
-              Log Voyage Route
-            </h2>
-            <form onSubmit={handleCreateVoyage} className="space-y-4 mt-4">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Vessel Registry Name</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3 text-slate-400"><i className="fa-solid fa-anchor"></i></span>
-                  <input
-                    type="text"
-                    placeholder="e.g. M/V Maria Angela"
-                    required
-                    value={vesselName}
-                    onChange={(e) => setVesselName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49] focus:border-transparent"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Voyage Passage</label>
-                <select
-                  value={route}
-                  onChange={(e) => setRoute(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49] cursor-pointer"
-                >
-                  <option value="Abra Port → Batangas">Abra Port → Batangas</option>
-                  <option value="Abra Port → Puerto Galera">Abra Port → Puerto Galera</option>
-                  <option value="Batangas → Abra Port">Batangas → Abra Port</option>
-                  <option value="Puerto Galera → Abra Port">Puerto Galera → Abra Port</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+        {isSuperAdmin ? (
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between relative z-10">
+            <div>
+              <h2 className="text-lg font-black text-[#003087] tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+                <span className="text-[#FF8800]"><i className="fa-solid fa-plus-circle"></i></span> Log Voyage Route
+              </h2>
+              <form onSubmit={handleCreateVoyage} className="space-y-4 mt-4">
                 <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Departure</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={depDateTime}
-                    onChange={(e) => setDepDateTime(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-                  />
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Vessel Registry Name</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400"><i className="fa-solid fa-anchor"></i></span>
+                    <input type="text" placeholder="e.g. M/V Maria Angela" required value={vesselName} onChange={(e) => setVesselName(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49] focus:border-transparent" />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Arrival Est</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={arrDateTime}
-                    onChange={(e) => setArrDateTime(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Vessel hull type</label>
-                  <select
-                    value={vesselType}
-                    onChange={(e) => setVesselType(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-                  >
-                    <option value="RORO">RORO Ferry</option>
-                    <option value="Passenger Ferry">Fast Craft</option>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Voyage Passage</label>
+                  <select value={route} onChange={(e) => setRoute(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49] cursor-pointer">
+                    <option value="Abra Port → Batangas">Abra Port → Batangas</option>
+                    <option value="Abra Port → Puerto Galera">Abra Port → Puerto Galera</option>
+                    <option value="Batangas → Abra Port">Batangas → Abra Port</option>
+                    <option value="Puerto Galera → Abra Port">Puerto Galera → Abra Port</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Hull Capacity</label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="1000"
-                    required
-                    value={capacity}
-                    onChange={(e) => setCapacity(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Departure</label>
+                    <input type="datetime-local" required value={depDateTime} onChange={(e) => setDepDateTime(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Arrival Est</label>
+                    <input type="datetime-local" required value={arrDateTime} onChange={(e) => setArrDateTime(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
+                  </div>
                 </div>
-              </div>
-            </form>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-1">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Vessel Type</label>
+                    <select value={vesselType} onChange={(e) => setVesselType(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]">
+                      <option value="RORO">RORO Ferry</option>
+                      <option value="Passenger Ferry">Fast Craft</option>
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Capacity</label>
+                    <input type="number" min="50" max="1000" required value={capacity} onChange={(e) => setCapacity(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button onClick={handleCreateVoyage} className="w-full mt-6 bg-[#009E49] hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-md transition-all duration-200 active:scale-95 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer border-b-4 border-emerald-800">
+              <i className="fa-solid fa-check-double text-yellow-300"></i> Dispatch Voyage
+            </button>
           </div>
-
-          <button
-            onClick={handleCreateVoyage}
-            className="w-full mt-6 bg-[#009E49] hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-md transition-all duration-200 hover:shadow-lg active:scale-95 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer border-b-4 border-emerald-800"
-          >
-            <i className="fa-solid fa-check-double text-yellow-300"></i> Dispatch New Voyage
-          </button>
-        </div>
+        ) : (
+          <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center opacity-60">
+            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3"><i className="fa-solid fa-lock text-slate-400 text-xl"></i></div>
+            <h3 className="text-sm font-black text-slate-500 uppercase tracking-tight">Voyage Control Locked</h3>
+            <p className="text-[10px] text-slate-400 font-bold mt-1 max-w-[180px]">New voyages can only be dispatched by Super Admin Profiles.</p>
+          </div>
+        )}
       </div>
 
-      {/* Online Reservation Management */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-        <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-          <span className="text-[#003087]"><i className="fa-solid fa-list-check"></i></span>
-          Counter Reservation & Boarding Management
-        </h2>
-        
-        {/* Filters and Searches */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <div className="w-full md:flex-1 relative">
-            <span className="absolute left-4 top-3 text-slate-400"><i className="fa-solid fa-magnifying-glass"></i></span>
-            <input
-              type="text"
-              placeholder="Search by passenger name or reservation REF ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full border border-slate-200 bg-white rounded-2xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-            />
-          </div>
-          <div className="flex w-full md:w-auto gap-2">
-            <select
-              value={filterRoute}
-              onChange={(e) => setFilterRoute(e.target.value)}
-              className="border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#009E49] cursor-pointer"
-            >
+        <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2"><span className="text-[#003087]"><i className="fa-solid fa-list-check"></i></span> Counter Reservations</h2>
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50 p-4 rounded-2xl">
+          <input type="text" placeholder="Search passenger name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 border border-slate-200 bg-white rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
+          <div className="flex gap-2">
+            <select value={filterRoute} onChange={(e) => setFilterRoute(e.target.value)} className="border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700">
               <option value="All">All Routes</option>
               <option value="Abra Port → Batangas">Abra Port → Batangas</option>
               <option value="Abra Port → Puerto Galera">Abra Port → Puerto Galera</option>
-              <option value="Batangas → Abra Port">Batangas → Abra Port</option>
-              <option value="Puerto Galera → Abra Port">Puerto Galera → Abra Port</option>
             </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#009E49] cursor-pointer"
-            >
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-700">
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Confirmed">Confirmed</option>
-              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
         </div>
-
-        {/* Reservations Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[650px]">
             <thead>
               <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-wider">
                 <th className="py-3">Ferry ID</th>
-                <th className="py-3">Passenger & Contact Info</th>
-                <th className="py-3">Registered Voyage Vessel</th>
-                <th className="py-3">Fare Class</th>
+                <th className="py-3">Passenger Info</th>
+                <th className="py-3">Vessel</th>
+                <th className="py-3">Fare</th>
                 <th className="py-3">Status</th>
-                <th className="py-3 text-right">Counter Actions</th>
+                <th className="py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredBookings.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-semibold text-sm">No reservations matching query.</td>
-                </tr>
-              ) : (
-                filteredBookings.map((b) => {
-                  const s = ships.find(shp => shp.id === b.shipId);
-                  return (
-                    <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 font-mono font-black text-xs text-slate-500">#{b.id.toUpperCase()}</td>
-                      <td className="py-4">
-                        <div className="font-extrabold text-slate-800">{b.name}</div>
-                        <span className="text-xs text-slate-400 font-mono font-bold">{b.contact}</span>
-                      </td>
-                      <td className="py-4">
-                        <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                          <span className="text-slate-400"><i className="fa-solid fa-anchor text-xs"></i></span>
-                          {s ? s.name : 'Unknown Vessel'}
-                        </div>
-                        <span className="text-xs text-slate-500 font-semibold">{s ? s.route : ''}</span>
-                      </td>
-                      <td className="py-4">
-                        <span className="bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider">
-                          {b.type} class
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          b.status === 'Confirmed' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' :
-                          b.status === 'Cancelled' ? 'bg-rose-50 border border-rose-200 text-rose-700' :
-                          'bg-amber-50 border border-amber-200 text-amber-700 animate-pulse'
-                        }`}>
-                          {b.status}
-                        </span>
-                      </td>
-                      <td className="py-4 text-right">
-                        <div className="flex gap-2 justify-end">
-                          {b.status === 'Pending' && (
-                            <>
-                              <button
-                                onClick={() => handleConfirmBooking(b)}
-                                className="bg-[#009E49] hover:bg-emerald-700 text-white font-black text-[10px] px-3.5 py-1.5 rounded-xl active:scale-95 transition uppercase tracking-wider cursor-pointer shadow-sm border-b-2 border-emerald-800"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => handleCancelBooking(b.id)}
-                                className="bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-black text-[10px] px-3.5 py-1.5 rounded-xl active:scale-95 transition uppercase tracking-wider cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          )}
-                          {b.status === 'Confirmed' && (
-                            <button
-                              onClick={() => setSelectedTicket({ ...b, route: s?.route, depTime: s?.depTime })}
-                              className="bg-[#003087] hover:bg-blue-900 text-white font-black text-[10px] px-3.5 py-1.5 rounded-xl active:scale-95 transition flex items-center gap-1.5 uppercase tracking-wider shadow-sm cursor-pointer border-b-2 border-blue-999"
-                            >
-                              <i className="fa-solid fa-print"></i> Issue Pass
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                  {filteredBookings.map((b) => {
+                    const s = ships.find(shp => shp.id === b.shipId);
+                    const acc = userAccounts.find(a => a.id === (b as any).accountId);
+                    
+                    return (
+                      <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4 font-mono font-black text-xs text-slate-500">#{b.id.toUpperCase()}</td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-3">
+                            {acc?.selfieUrl && (
+                              <img 
+                                src={acc.selfieUrl} 
+                                className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-sm ring-2 ring-emerald-500/20" 
+                                alt="Selfie"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            <div>
+                              <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                                {b.name}
+                                {acc && (
+                                  <span className="text-emerald-500 text-[10px]" title="Verified Account">
+                                    <i className="fa-solid fa-circle-check"></i>
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs text-slate-400 font-mono">{b.contact}</span>
+                            </div>
+                          </div>
+                        </td>
+                    <td className="py-4"><div className="font-bold text-slate-700">{s ? s.name : 'Unknown Vessel'}</div></td>
+                    <td className="py-4 font-bold text-slate-600">{b.type}</td>
+                    <td className="py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${b.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right">
+                      <div className="flex gap-2 justify-end">
+                        {b.status === 'Pending' && (
+                          <button onClick={() => handleConfirmBooking(b)} className="bg-[#009E49] text-white font-black text-[10px] px-3.5 py-1.5 rounded-xl uppercase border-b-2 border-emerald-800">Confirm</button>
+                        )}
+                        {b.status === 'Confirmed' && (
+                          <button onClick={() => setSelectedTicket({ ...b, route: s?.route, depTime: s?.depTime })} className="bg-[#003087] text-white font-black text-[10px] px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 uppercase border-b-2 border-blue-900">
+                            <i className="fa-solid fa-print"></i> Issue
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Announcements Board */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
-          <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <span className="text-[#FF8800]"><i className="fa-solid fa-bullhorn animate-bounce"></i></span>
-            Abra Port PA Board Broadcast Notices
+      {isSuperAdmin && (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+            <span className="text-[#FF8800]"><i className="fa-solid fa-bullhorn animate-bounce"></i></span> PA Broadcast Notices
           </h2>
-          
-          {/* Active profile selector */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-1.5 rounded-2xl text-[10px] font-bold">
-            <span className="text-slate-500 pl-1.5"><i className="fa-solid fa-microphone text-indigo-500"></i> Local AI Voice:</span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setVoiceProfile('feminine')}
-                className={`px-2 py-1 rounded-lg transition ${
-                  voiceProfile === 'feminine'
-                    ? 'bg-[#003087] text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                ♀ Female
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceProfile('masculine')}
-                className={`px-2 py-1 rounded-lg transition ${
-                  voiceProfile === 'masculine'
-                    ? 'bg-[#003087] text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                ♂ Male
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceProfile('robotic')}
-                className={`px-2 py-1 rounded-lg transition ${
-                  voiceProfile === 'robotic'
-                    ? 'bg-[#003087] text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                🤖 Bot
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleAddNotice} className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            placeholder="Post crucial itinerary warnings, vessel dock change alerts, or meteorological updates..."
-            value={newNotice}
-            onChange={(e) => setNewNotice(e.target.value)}
-            className="flex-1 border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]"
-          />
-          <button
-            type="submit"
-            className="bg-[#FF8800] hover:bg-[#E07700] text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm border-b-4 border-orange-700"
-          >
-            Broadcast Notice
-          </button>
-        </form>
- 
-        <div className="max-h-52 overflow-y-auto space-y-3 pr-2 scrollbar-thin divide-y divide-slate-100">
-          {announcements.map((a, idx) => (
-            <motion.div 
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              key={a.id} 
-              className="bg-slate-50 border-l-4 border-[#009E49] p-4 rounded-r-2xl text-sm flex justify-between items-start pt-4 first:pt-0"
-            >
-              <div className="space-y-1 flex-1">
-                <p className="text-slate-700 font-bold leading-relaxed">{a.text}</p>
-                <div className="flex gap-3 text-xs text-slate-400 font-semibold pt-1">
-                  <span>Author: <strong className="text-slate-600">{a.author}</strong></span>
-                  <span>•</span>
-                  <span>{formatPST(a.date)}</span>
-                </div>
+          <form onSubmit={handleAddNotice} className="flex flex-col sm:flex-row gap-3">
+            <input type="text" placeholder="Post warning or update..." value={newNotice} onChange={(e) => setNewNotice(e.target.value)} className="flex-1 border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
+            <button type="submit" className="bg-[#FF8800] text-white px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-orange-700">Broadcast</button>
+          </form>
+          <div className="max-h-52 overflow-y-auto space-y-3 pr-2 divide-y divide-slate-100">
+            {announcements.map((a) => (
+              <div key={a.id} className="bg-slate-50 border-l-4 border-[#009E49] p-4 rounded-r-2xl text-sm flex justify-between items-start pt-4 first:pt-0">
+                <div className="flex-1"><p className="text-slate-700 font-bold">{a.text}</p><div className="text-[10px] text-slate-400 font-semibold">{formatPST(a.date)}</div></div>
+                <button onClick={() => { setSpeakingNoticeId(a.id); speakAnnouncement(a.text, { profile: voiceProfile, onEnd: () => setSpeakingNoticeId(null) }); }} className="bg-[#009E49] text-white font-extrabold px-3 py-1.5 rounded-xl uppercase text-[10px] h-8 flex items-center gap-1">
+                  <i className={speakingNoticeId === a.id ? "fa-solid fa-stop" : "fa-solid fa-volume-high"}></i> {speakingNoticeId === a.id ? 'Stop' : 'Speak'}
+                </button>
               </div>
-
-              {/* Speaker action */}
-              <div className="ml-4 shrink-0 flex items-center gap-1 py-1">
-                {speakingNoticeId === a.id ? (
-                  <button
-                    onClick={() => {
-                      stopSpeaking();
-                      setSpeakingNoticeId(null);
-                    }}
-                    className="bg-red-600 hover:bg-red-700 text-white font-extrabold px-3 py-1.5 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm animate-pulse text-[10px] uppercase tracking-wider h-10"
-                    title="Stop Announcement Speaker"
-                  >
-                    <i className="fa-solid fa-circle-stop mr-1"></i> Stop
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setSpeakingNoticeId(a.id);
-                      speakAnnouncement(a.text, {
-                        profile: voiceProfile,
-                        onEnd: () => setSpeakingNoticeId(null),
-                        onError: () => setSpeakingNoticeId(null)
-                      });
-                    }}
-                    className="bg-[#009E49] hover:bg-[#00803B] text-white font-extrabold px-3 py-1.5 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm text-[10px] uppercase tracking-wider h-10"
-                    title="Broadcast via PA Speaker"
-                  >
-                    <i className="fa-solid fa-volume-high mr-1"></i> Speak
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* TICKET POPUP / BOARDING PASS MODAL */}
-      {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in no-print">
-          <div className="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col">
-            
-            {/* Boarding Pass header */}
-            <div className="bg-[#009E49] text-white p-5 text-center space-y-1 relative">
-              <div className="flex items-center justify-center gap-1.5">
-                <div className="bg-white/10 text-[#FFD700] p-1 rounded font-bold text-[10px]">
-                  <i className="fa-solid fa-anchor"></i> MSLI
-                </div>
-                <h3 className="font-extrabold text-sm uppercase tracking-wider font-sans">Boarding Pass Ticket</h3>
-              </div>
-              <p className="text-[10px] font-sans tracking-widest text-[#FFD700] font-black uppercase">MONTENEGRO SHIPPING LINES</p>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="absolute top-3 right-4 text-white/85 hover:text-white font-black text-xl cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-
-            {/* Print Area */}
-            <div id="print-ticket" className="p-6 space-y-5 flex-1 bg-white">
-              <div className="flex justify-between items-start pb-4 border-b border-dashed border-slate-200">
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Passenger Name</p>
-                  <p className="text-base font-black text-slate-800 leading-tight">{selectedTicket.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Fare Category</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-[#009E49] border border-emerald-200 rounded font-mono block mt-1 uppercase tracking-wide">
-                    {selectedTicket.type}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-dashed border-slate-200">
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Passage Route</p>
-                  <p className="text-xs font-extrabold text-[#003087]">{selectedTicket.route}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">PST Dep Time</p>
-                  <p className="text-xs text-slate-800 font-mono font-bold">{formatPST(selectedTicket.depTime)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-dashed border-slate-200 font-semibold text-slate-600">
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Port Station</p>
-                  <p className="text-xs text-slate-800 font-extrabold">Abra de Ilog</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Boarding Gate</p>
-                  <p className="text-xs text-[#00a651] font-black">Open Cabin Class</p>
-                </div>
-              </div>
-
-              {/* QR Code */}
-              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${selectedTicket.id}`}
-                  alt="Booking Security QR Code"
-                  referrerPolicy="no-referrer"
-                  className="w-32 h-32 border border-slate-100 rounded-xl p-2 bg-white shadow-inner"
-                />
-                <p className="text-[10px] font-mono font-black text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200">#{selectedTicket.id.toUpperCase()}</p>
-              </div>
-
-              {/* Footer text for print */}
-              <div className="hidden print:block text-center text-[8px] text-slate-400 uppercase tracking-widest leading-loose">
-                Thank you for traveling with us!<br />
-                Have a safe voyage.
-              </div>
-            </div>
-
-            {/* Buttons UI only, hidden on print */}
-            <div className="p-4 bg-slate-50 border-t flex gap-2 no-print">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 bg-[#009E49] hover:bg-emerald-700 text-white text-xs font-black py-3.5 rounded-2xl shadow transition-all duration-200 border-b-2 border-emerald-800 cursor-pointer"
-              >
-                🖨️ Print Boarding Pass
-              </button>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="bg-slate-250 hover:bg-slate-300 text-slate-700 text-xs font-black py-3.5 px-6 rounded-2xl transition border border-slate-350 cursor-pointer"
-              >
-                Dismiss
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
+      {selectedTicket && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm no-print">
+          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-[#009E49] text-white p-5 text-center font-black uppercase text-sm">Boarding Pass</div>
+            <div id="print-ticket" className="p-6 bg-white space-y-4">
+              <div className="flex justify-between border-b border-dashed pb-2">
+                <div><label className="text-[9px] uppercase font-black text-slate-400">Passenger</label><p className="font-black text-slate-800">{selectedTicket.name}</p></div>
+                <div className="text-right"><label className="text-[9px] uppercase font-black text-slate-400">Class</label><p className="font-bold text-[#009E49]">{selectedTicket.type}</p></div>
+              </div>
+              <div><label className="text-[9px] uppercase font-black text-slate-400">Voyage</label><p className="text-xs font-black">{selectedTicket.route}</p></div>
+              <div className="flex justify-center p-4 bg-slate-50 rounded-2xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${selectedTicket.id}`} className="w-32 h-32" referrerPolicy="no-referrer" /></div>
+              <p className="text-center font-mono text-[10px] font-black text-slate-400">#{selectedTicket.id.toUpperCase()}</p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t flex gap-2 no-print">
+              <button onClick={() => window.print()} className="flex-1 bg-[#009E49] text-white text-xs font-black py-3 rounded-xl">Print</button>
+              <button onClick={() => setSelectedTicket(null)} className="px-4 text-xs font-bold text-slate-500">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-

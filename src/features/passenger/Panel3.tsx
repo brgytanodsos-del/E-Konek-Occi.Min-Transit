@@ -25,7 +25,9 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     formatPST,
     abraWeather,
     mamburaoWeather,
-    isOnline
+    isOnline,
+    setToastMessage,
+    userAccount
   } = useApp();
 
   // Active Screen tracking
@@ -35,15 +37,25 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
 
   // Form Fields
   const [voyageId, setVoyageId] = useState('');
-  const [ferryName, setFerryName] = useState('');
-  const [ferryContact, setFerryContact] = useState('');
+  const [ferryName, setFerryName] = useState(userAccount?.fullName || '');
+  const [ferryContact, setFerryContact] = useState(userAccount?.mobileNumber || '');
   const [ticketType, setTicketType] = useState('Regular');
 
   const [tripId, setTripId] = useState('');
   const [pickupPoint, setPickupPoint] = useState('');
-  const [shuttleName, setShuttleName] = useState('');
-  const [shuttleContact, setShuttleContact] = useState('');
+  const [shuttleName, setShuttleName] = useState(userAccount?.fullName || '');
+  const [shuttleContact, setShuttleContact] = useState(userAccount?.mobileNumber || '');
   const [seatsCount, setSeatsCount] = useState('1');
+
+  // Sync form fields if userAccount (loaded from storage/async) changes
+  useEffect(() => {
+    if (userAccount) {
+      if (!ferryName) setFerryName(userAccount.fullName);
+      if (!ferryContact) setFerryContact(userAccount.mobileNumber);
+      if (!shuttleName) setShuttleName(userAccount.fullName);
+      if (!shuttleContact) setShuttleContact(userAccount.mobileNumber);
+    }
+  }, [userAccount]);
 
   // Interactive pulse and countdowns
   const [refreshTimer, setRefreshTimer] = useState(30);
@@ -97,8 +109,20 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
+  // 1. Map Initialization Effect - Runs ONLY when trackedTripId changes or on component mount/unmount.
   useEffect(() => {
-    if (!trackedTripId || !trackMapRef.current) return;
+    if (!trackedTripId || !trackMapRef.current) {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn("Passenger map removal error:", e);
+        }
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+      return;
+    }
 
     const L = (window as any).L;
     if (!L) return;
@@ -112,12 +136,13 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       if (trackMapRef.current) {
         delete (trackMapRef.current as any)._leaflet_id;
       }
-      mapInstanceRef.current = L.map(trackMapRef.current, {
+      const mapInstance = L.map(trackMapRef.current, {
         zoomControl: true,
         scrollWheelZoom: false
       }).setView(initialPos, 12);
+      mapInstanceRef.current = mapInstance;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstanceRef.current);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
 
       const orangeDotIcon = L.divIcon({
         className: 'custom-gps-marker',
@@ -130,35 +155,86 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
         iconSize: [24, 24]
       });
 
-      markerRef.current = L.marker(initialPos, { icon: orangeDotIcon }).addTo(mapInstanceRef.current);
+      markerRef.current = L.marker(initialPos, { icon: orangeDotIcon }).addTo(mapInstance);
+
+      // Invalidation & Auto-resize Strategy
+      let alive = true;
+      const invalidateMapSize = () => {
+        if (alive && mapInstance && (mapInstance as any)._mapPane) {
+          try {
+            mapInstance.invalidateSize({ animate: false });
+          } catch (e) {
+            console.warn("Passenger map invalidateSize error:", e);
+          }
+        }
+      };
+
+      const resizeObserver = new window.ResizeObserver(() => {
+        invalidateMapSize();
+      });
+      if (trackMapRef.current) {
+        resizeObserver.observe(trackMapRef.current);
+      }
+
+      // Schedule various timeouts to make sure layout has settled (especially when animation completes)
+      const timeouts = [10, 50, 100, 200, 500, 1000, 2000].map(delay => 
+        setTimeout(invalidateMapSize, delay)
+      );
+
+      mapInstance.whenReady(() => {
+        setTimeout(invalidateMapSize, 10);
+      });
+
+      return () => {
+        alive = false;
+        resizeObserver.disconnect();
+        timeouts.forEach(clearTimeout);
+
+        if (mapInstanceRef.current) {
+          try {
+            mapInstanceRef.current.remove();
+          } catch (e) {
+            console.warn("Passenger map cleanup error:", e);
+          }
+          mapInstanceRef.current = null;
+          markerRef.current = null;
+        }
+      };
     }
+  }, [trackedTripId]);
+
+  // 2. Dynamic GPS Marker Coordinate Updates - Runs when trips update (every 3s) or when map is loaded.
+  useEffect(() => {
+    if (!trackedTripId || !mapInstanceRef.current || !markerRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    const activeTrip = trips.find(t => t.id === trackedTripId);
+    if (!activeTrip) return;
 
     const currentPos = getTripLocation(activeTrip.id, activeTrip.route);
     if (markerRef.current) {
       markerRef.current.setLatLng(currentPos);
       mapInstanceRef.current.panTo(currentPos);
       markerRef.current.bindPopup(`
-        <div class="text-xs font-semibold">
+        <div class="text-xs font-semibold p-1">
           <b>${activeTrip.driver}</b><br/>
           Route: ${activeTrip.route}<br/>
-          Status: <span class="text-orange-600">${activeTrip.status}</span>
+          Status: <span class="text-orange-600 font-bold">${activeTrip.status}</span>
         </div>
       `).openPopup();
     }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-        markerRef.current = null;
-      }
-    };
-  }, [trackedTripId, trips]);
+  }, [trackedTripId, trips, mapInstanceRef.current]);
 
   // Submit Ferry Booking Form
   const handleFerryBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!voyageId || !ferryName || !ferryContact) return alert("Please fill all booking details");
+    if (!voyageId || !ferryName || !ferryContact) {
+      setToastMessage("⚠️ Please fill out all booking details");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
 
     const selVoyage = ships.find(s => s.id === voyageId);
     if (!selVoyage) return;
@@ -171,7 +247,8 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       contact: ferryContact,
       type: ticketType,
       status: isOnline ? 'Pending' : 'Queued',
-      bookingType: 'ferry'
+      bookingType: 'ferry',
+      accountId: userAccount?.id || null
     };
 
     if (isOnline) {
@@ -200,7 +277,11 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   // Submit Land Booking Form
   const handleLandBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tripId || !pickupPoint || !shuttleName || !shuttleContact) return alert("Please fill all booking details");
+    if (!tripId || !pickupPoint || !shuttleName || !shuttleContact) {
+      setToastMessage("⚠️ Please fill out all booking details");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
 
     const selTrip = trips.find(t => t.id === tripId);
     if (!selTrip) return;
@@ -215,7 +296,8 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       contact: shuttleContact,
       seats: count,
       status: isOnline ? 'Pending' : 'Queued',
-      bookingType: 'land'
+      bookingType: 'land',
+      accountId: userAccount?.id || null
     };
 
     if (isOnline) {

@@ -1,19 +1,49 @@
 import admin from "firebase-admin";
-import dotenv from "dotenv";
+import { getFirestore } from "firebase-admin/firestore";
+import * as dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
-let adminApp: admin.app.App | null = null;
+// Load config to get databaseId
+let databaseId = "(default)";
+let projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0184019680";
 
 try {
-  adminApp = admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  });
-} catch (error: any) {
-  console.warn("⚠️ Firebase Admin initialization failed (usually expected in sandbox/dev env):", error.message);
-  // Optional: fallback to dummy initialization if needed, or keep as null
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (config.projectId) projectId = config.projectId;
+    if (config.firestoreDatabaseId) databaseId = config.firestoreDatabaseId;
+  }
+} catch (e) {
+  console.warn("Could not load firebase-applet-config.json, using defaults.");
 }
+
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: projectId,
+    });
+    console.log(`✅ Firebase Admin initialized. Project: ${projectId}, Database: ${databaseId}`);
+  } catch (error: any) {
+    if (error.code === 'app/duplicate-app') {
+      console.log('Firebase Admin already initialized (duplicate-app).');
+    } else {
+      console.warn("⚠️ Firebase Admin initialization failed:", error.message);
+    }
+  }
+}
+
+// Export the initialized firestore instance with the correct database ID
+export const db = getFirestore(databaseId === "(default)" ? undefined : databaseId);
+
+// Test the database connection to catch errors early
+db.collection('health').limit(1).get().catch(err => {
+  console.error(`🚨 Firestore Connection Error (Project: ${projectId}, DB: ${databaseId}):`, err.message);
+});
 
 export default admin;
 

@@ -47,8 +47,31 @@ export interface Announcement {
   author: string;
 }
 
+export interface UserAccount {
+  id: string;
+  accountType: 'passenger' | 'driver';
+  fullName: string;
+  mobileNumber: string;
+  address: string;
+  addressCoords: { lat: number; lng: number } | null;
+  selfieDataUrl: string;
+  createdAt: string;
+  bookingIds: string[];
+}
+
+export interface AdminAccount {
+  id: string;
+  fullName: string;
+  role: 'port' | 'terminal';
+  pin: string;
+  createdAt: string;
+  lastLogin?: string;
+  status: 'active' | 'suspended' | 'pending';
+}
+
 export interface WeatherData {
   temperature_2m: number;
   weathercode: number;
   windspeed_10m: number;
+  lastUpdated: string;
 }

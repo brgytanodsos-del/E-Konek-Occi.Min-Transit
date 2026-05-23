@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import dotenv from 'dotenv';
 import shipRoutes from './routes/shipRoutes';
+import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
@@ -13,19 +14,21 @@ export async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Security Hardening - Disabled helmet as it blocks iframe previews in AI Studio via X-Frame-Options and Content-Security-Policy
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // limit each IP to 100 requests per windowMs
-      message: "Too many requests, please try again later."
-    })
-  );
+  // Trust proxy for accurate rate limiting behind reverse proxies
+  app.set('trust proxy', 1);
+
+  // Rate limit auth endpoint: max 10 requests per IP per 15 min
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { success: false, message: "Too many PIN attempts. Please wait 15 minutes." }
+  });
 
   app.use(cors());
   app.use(express.json());
 
   // Routes
+  app.use('/api/auth', authLimiter, authRoutes);
   app.use('/api/ships', shipRoutes);
 
   // Vite middleware for development
