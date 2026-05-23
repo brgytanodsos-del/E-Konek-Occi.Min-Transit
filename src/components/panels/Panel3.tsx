@@ -1,289 +1,138 @@
-import React, { useState, useEffect, useContext } from 'react';
+import { useState, useContext } from 'react';
+import { Search, MapPin, Bell } from 'lucide-react';
+import { BookingModal } from '../BookingModal';
+import { useAppStore } from '../../store/useAppStore';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { AppContext } from '../../context/AppContext';
-import { WeatherWidget } from '../WeatherWidget';
-import { MapView } from '../MapView';
-import { generateId } from '../../context/AppContext';
-import { addTripToCalendar } from '../Panel5';
 
-export const Panel3 = ({ isSuperAdmin }: { isSuperAdmin?: boolean }) => {
-    const context = useContext(AppContext);
-    if (!context) return null;
-    const { ships, setShips, trips, setTrips, ferryBookings, setFerryBookings, vanBookings, setVanBookings, announcements, abraWeather, mamburaoWeather } = context;
-    
-    const [ferryForm, setFerryForm] = useState({ shipId: '', name: '', contact: '', type: 'Regular' });
-    const [vanForm, setVanForm] = useState({ tripId: '', pickup: '', name: '', contact: '', seats: 1 });
-    const [bookingSuccess, setBookingSuccess] = useState<{type: string, ref: string, details: any} | null>(null);
-    const [trackingMode, setTrackingMode] = useState<string | null>(null); 
-    
-    const [refreshTimer, setRefreshTimer] = useState(30);
-    const [pulse, setPulse] = useState(false);
+interface Panel3Props {
+  isSuperAdmin?: boolean;
+}
 
-    useEffect(() => {
-        const int = setInterval(() => {
-            setRefreshTimer(prev => {
-                if (prev === 1) {
-                    setPulse(true);
-                    setTimeout(() => setPulse(false), 1000);
-                    return 30;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(int);
-    }, []);
+export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
+  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const { addBooking, bookings } = useAppStore();
 
-    const handleFerrySubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const ship = ships.find(s => s.id === ferryForm.shipId);
-        if (ship && ship.available > 0) {
-            setShips(ships.map(s => s.id === ship.id ? { ...s, available: s.available - 1 } : s));
-        }
-        const newBooking = { ...ferryForm, id: generateId(), status: 'Pending' };
-        setFerryBookings([...ferryBookings, newBooking]);
-        setBookingSuccess({ type: 'Ferry', ref: newBooking.id, details: ferryForm });
-        setFerryForm({ shipId: '', name: '', contact: '', type: 'Regular' });
+  const availableTrips = [
+    { id: 1, type: "Ferry", route: "San Jose → Batangas", time: "08:30", price: 850, status: "Available" },
+    { id: 2, type: "Van", route: "San Jose → Mamburao", time: "09:15", price: 320, status: "Filling Fast" },
+    { id: 3, type: "Ferry", route: "Mamburao → Batangas", time: "11:45", price: 920, status: "Available" },
+  ];
+
+  const handleBook = (trip: any) => {
+    setSelectedTrip(trip);
+    setModalOpen(true);
+  };
+
+  const confirmBooking = (passengers: number, name: string) => {
+    const newBooking = {
+      id: Date.now().toString(),
+      route: selectedTrip.route,
+      type: selectedTrip.type.toLowerCase() as 'ferry' | 'van',
+      price: selectedTrip.price,
+      passengers,
+      date: new Date().toISOString(),
     };
+    addBooking(newBooking);
+    alert(`✅ Booking Successful for ${name}!`);
+    setModalOpen(false);
+  };
 
-    const handleVanSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const trip = trips.find(t => t.id === vanForm.tripId);
-        if (trip && trip.available >= vanForm.seats) {
-            setTrips(trips.map(t => t.id === trip.id ? { ...t, available: t.available - vanForm.seats } : t));
-        }
-        const newBooking = { ...vanForm, id: generateId(), status: 'Pending' };
-        setVanBookings([...vanBookings, newBooking]);
-        setBookingSuccess({ type: 'Van', ref: newBooking.id, details: vanForm });
-        setVanForm({ tripId: '', pickup: '', name: '', contact: '', seats: 1 });
-    };
+  return (
+    <div className="p-6 space-y-8 max-w-7xl mx-auto pb-20">
+      <div>
+        <h2 className="text-3xl font-bold text-primary">👤 Passenger Portal</h2>
+        <p className="text-gray-600 font-medium">Book • Track • Travel with Confidence</p>
+      </div>
 
-    if (trackingMode) {
-        const trackedTrip = trips.find(t => t.id === trackingMode);
-        const markerPos = trackedTrip ? context.getTripLocation(trackedTrip.route) : ([13.2, 120.6] as [number, number]);
-        
-        return (
-            <div className="pb-20 h-screen flex flex-col max-w-7xl mx-auto bg-bglight">
-                <div className="bg-navy text-white p-4 shadow-md flex justify-between items-center sm:rounded-b-lg">
-                    <h1 className="text-xl font-bold">Live Tracking</h1>
-                    <button onClick={() => setTrackingMode(null)} className="bg-orange hover:bg-orange/90 transition-colors px-3 py-1 rounded text-sm font-bold tap-target">Close</button>
-                </div>
-                <div className="flex-1 relative">
-                    <MapView 
-                        center={markerPos} 
-                        zoom={13}
-                        markers={[{ id: 'user-ride', baseRoute: trackedTrip?.route, pos: markerPos, popupText: "<b>Your Ride</b><br/>Heading to destination" }]} 
-                        liveUpdate={true}
-                    />
-                    <div className="absolute bottom-4 left-4 right-4 bg-white p-4 rounded-lg shadow-lg z-[1000] max-w-lg mx-auto">
-                        <h3 className="font-bold text-navy">Trip Status</h3>
-                        <p className="text-sm text-gray-600">Your vehicle ({trackedTrip?.route}) is on the move. Please be ready at your pickup point.</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    const isHighWind = abraWeather && abraWeather.windspeed_10m > 30;
-    const formatPST = (dateStr: string) => new Date(dateStr).toLocaleString('en-US', { timeZone: 'Asia/Manila', hour12: true, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-    const actualVanBooking = bookingSuccess && bookingSuccess.type === 'Van' ? vanBookings.find(b => b.id === bookingSuccess.ref) : null;
-    const isVanConfirmed = actualVanBooking?.status === 'Confirmed';
-    
-    const actualFerryBooking = bookingSuccess && bookingSuccess.type === 'Ferry' ? ferryBookings.find(b => b.id === bookingSuccess.ref) : null;
-    const isFerryConfirmed = actualFerryBooking?.status === 'Confirmed';
-
-    const [syncedIds, setSyncedIds] = useState<string[]>([]);
-
-    useEffect(() => {
-        if (bookingSuccess && context.accessToken) {
-            const id = bookingSuccess.ref;
-            if (!syncedIds.includes(id)) {
-                if (bookingSuccess.type === 'Van' && isVanConfirmed && actualVanBooking) {
-                    const trip = trips.find(t => t.id === actualVanBooking.tripId);
-                    if (trip && trip.depTime) {
-                        addTripToCalendar(context.accessToken, `Van Trip: ${trip.route}`, `Pickup at: ${actualVanBooking.pickup}`, trip.depTime, new Date(new Date(trip.depTime).getTime() + 7200000).toISOString());
-                        setSyncedIds(prev => [...prev, id]);
-                    }
-                } else if (bookingSuccess.type === 'Ferry' && isFerryConfirmed && actualFerryBooking) {
-                    const ship = ships.find(s => s.id === actualFerryBooking.shipId);
-                    if (ship && ship.depTime && ship.arrTime) {
-                        addTripToCalendar(context.accessToken, `Ferry Voyage: ${ship.route}`, `Vessel: ${ship.name}`, ship.depTime, ship.arrTime);
-                        setSyncedIds(prev => [...prev, id]);
-                    }
-                }
-            }
-        }
-    }, [bookingSuccess, isVanConfirmed, isFerryConfirmed, actualVanBooking, actualFerryBooking, context.accessToken, syncedIds, trips, ships]);
-
-    return (
-        <div className="pb-20 max-w-7xl mx-auto">
-            <div className="bg-navy text-white p-8 text-center shadow-md relative overflow-hidden sm:rounded-b-2xl">
-                <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNmZmYiLz48L3N2Zz4=')]"></div>
-                <h1 className="text-3xl font-black relative z-10 tracking-tight">MindoroTransit</h1>
-                <p className="text-sm font-bold text-orange mt-1 relative z-10 uppercase tracking-widest">Montenegro Shipping & Mamburao Terminal</p>
-            </div>
-
-            {isHighWind && (
-                <div className="bg-red-600 text-white p-4 text-sm font-bold text-center shadow-md flex items-center justify-center gap-2 mt-4 mx-4 rounded-xl">
-                    <span className="text-xl">⚠️</span> 
-                    <span className="tracking-wide">WIND ADVISORY: High winds detected at Abra Port. Ferry schedules may be delayed or cancelled.</span>
-                </div>
-            )}
-
-            <div className="p-4 space-y-6 mt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="max-h-[160px]"><WeatherWidget weatherData={abraWeather} title="Abra Port" /></div>
-                    <div className="max-h-[160px]"><WeatherWidget weatherData={mamburaoWeather} title="Mamburao" /></div>
-                </div>
-
-                {announcements.length > 0 && (
-                    <div className="bg-orange/10 border-l-4 border-orange p-5 rounded-2xl shadow-sm">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-orange flex items-center gap-2">
-                            <span>📢</span> LATEST NOTICE
-                        </h3>
-                        <p className="text-sm font-medium text-gray-800 mt-2">{announcements[0].text}</p>
-                    </div>
-                )}
-
-                {bookingSuccess && (
-                    <div className="bg-green-50 border border-green-200 p-6 rounded-2xl shadow-sm text-center space-y-4">
-                        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">✓</div>
-                        <h3 className="font-black text-green-800 text-lg uppercase tracking-tight">Booking Submitted!</h3>
-                        <p className="text-sm font-medium text-gray-600">Your {bookingSuccess.type} booking is pending confirmation.</p>
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 inline-block px-8">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reference Number</p>
-                            <p className="font-mono font-black text-2xl text-navy tracking-widest mt-1">{bookingSuccess.ref.toUpperCase()}</p>
-                        </div>
-                        <div className="flex gap-4 pt-2">
-                            <button onClick={() => setBookingSuccess(null)} className="flex-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold uppercase tracking-wider text-xs py-3 rounded-xl tap-target transition-colors shadow-sm">Close</button>
-                            {bookingSuccess.type === 'Van' && isVanConfirmed && (
-                                <button onClick={() => { 
-                                    setTrackingMode(bookingSuccess.details.tripId); 
-                                    setBookingSuccess(null); 
-                                }} className="flex-1 bg-navy hover:bg-navy/90 text-white font-bold uppercase tracking-wider text-xs py-3 rounded-xl tap-target transition-colors shadow-sm">Track Ride</button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                <div className="space-y-6">
-                    <div className="flex justify-between items-end border-b border-gray-200 pb-2">
-                        <h2 className="font-black text-navy text-xl uppercase tracking-tight">Live Schedules</h2>
-                        <span className="text-[10px] font-bold text-gray-400 font-mono uppercase tracking-widest flex items-center gap-2">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Refreshing in {refreshTimer}s
-                        </span>
-                    </div>
-                    
-                    <div className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${pulse ? 'ring-2 ring-orange/50' : ''}`}>
-                        <div className="bg-gray-50 border-b border-gray-100 p-4">
-                            <h3 className="font-black text-navy uppercase tracking-wider text-sm">Ferry Departures</h3>
-                        </div>
-                        <div className="p-0 divide-y divide-gray-50">
-                            {ships.map(ship => (
-                                <div key={ship.id} className="p-4 flex justify-between items-center hover:bg-blue-50/30 transition-colors">
-                                    <div>
-                                        <p className="font-bold text-gray-800">{ship.route}</p>
-                                        <p className="text-[10px] font-mono text-gray-500 mt-1"><span className="font-bold text-gray-400">{ship.name}</span> • {formatPST(ship.depTime)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className={`text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full ${ship.status === 'Boarding' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{ship.status}</span>
-                                        <p className="text-[10px] font-bold tracking-wider text-orange mt-2">{ship.available} SEATS LEFT</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${pulse ? 'ring-2 ring-orange/50' : ''}`}>
-                        <div className="bg-gray-50 border-b border-gray-100 p-4">
-                            <h3 className="font-black text-navy uppercase tracking-wider text-sm">Terminal Departures</h3>
-                        </div>
-                        <div className="p-0 divide-y divide-gray-50">
-                            {trips.map(trip => (
-                                <div key={trip.id} className="p-4 flex justify-between items-center hover:bg-blue-50/30 transition-colors">
-                                    <div>
-                                        <p className="font-bold text-gray-800">{trip.route}</p>
-                                        <p className="text-[10px] font-mono text-gray-500 mt-1"><span className="font-bold text-gray-400">{trip.type}</span> • {formatPST(trip.depTime)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className={`text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full ${trip.status === 'Boarding' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{trip.status}</span>
-                                        <p className="text-[10px] font-bold tracking-wider text-orange mt-2">{trip.available} SEATS LEFT</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-                    <form onSubmit={handleFerrySubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-                        <h2 className="font-black text-navy text-lg uppercase tracking-tight border-b border-gray-100 pb-3 mb-4">Book a Ferry Ticket <span className="text-orange whitespace-nowrap">(Montenegro)</span></h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Select Voyage</label>
-                                <select required className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={ferryForm.shipId} onChange={e => setFerryForm({...ferryForm, shipId: e.target.value})}>
-                                    <option value="">Select Voyage...</option>
-                                    {ships.filter(s => s.status === 'Scheduled' || s.status === 'Boarding').map(s => (
-                                        <option key={s.id} value={s.id} disabled={s.available <= 0}>{s.route} - {formatPST(s.depTime)} {s.available <= 0 ? '(FULL)' : ''}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Passenger Name</label>
-                                <input required type="text" placeholder="e.g. Juan dela Cruz" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={ferryForm.name} onChange={e => setFerryForm({...ferryForm, name: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Contact Number</label>
-                                <input required type="tel" placeholder="09XX XXX XXXX" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={ferryForm.contact} onChange={e => setFerryForm({...ferryForm, contact: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Ticket Type</label>
-                                <select className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={ferryForm.type} onChange={e => setFerryForm({...ferryForm, type: e.target.value})}>
-                                    <option>Regular</option>
-                                    <option>Student</option>
-                                    <option>Senior</option>
-                                    <option>PWD</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" className="w-full bg-orange hover:bg-orange/90 text-white font-bold text-sm tracking-wider uppercase px-6 py-4 rounded-xl tap-target mt-6 transition-colors shadow-sm">Book Ferry</button>
-                    </form>
-
-                    <form onSubmit={handleVanSubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-                        <h2 className="font-black text-navy text-lg uppercase tracking-tight border-b border-gray-100 pb-3 mb-4">Book a Van/Bus Seat <span className="text-orange whitespace-nowrap">(Terminal)</span></h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Select Route</label>
-                                <select required className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={vanForm.tripId} onChange={e => setVanForm({...vanForm, tripId: e.target.value})}>
-                                    <option value="">Select Route...</option>
-                                    {trips.filter(t => t.status === 'Scheduled' || t.status === 'Boarding').map(t => (
-                                        <option key={t.id} value={t.id} disabled={t.available <= 0}>{t.route} - {formatPST(t.depTime)} {t.available <= 0 ? '(FULL)' : ''}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Pickup Point</label>
-                                <input required type="text" placeholder="e.g. Mamburao Plaza" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={vanForm.pickup} onChange={e => setVanForm({...vanForm, pickup: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Passenger Name</label>
-                                <input required type="text" placeholder="e.g. Maria Clara" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={vanForm.name} onChange={e => setVanForm({...vanForm, name: e.target.value})} />
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Contact</label>
-                                    <input required type="tel" placeholder="09XX" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={vanForm.contact} onChange={e => setVanForm({...vanForm, contact: e.target.value})} />
-                                </div>
-                                <div className="w-24">
-                                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Seats</label>
-                                    <input required type="number" min={1} max={10} placeholder="1" className="w-full border border-gray-200 bg-gray-50 focus:bg-white p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy tap-target text-sm" value={vanForm.seats} onChange={e => setVanForm({...vanForm, seats: parseInt(e.target.value) || 1})} />
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" className="w-full bg-navy hover:bg-navy/90 text-white font-bold text-sm tracking-wider uppercase px-6 py-4 rounded-xl tap-target mt-6 transition-colors shadow-sm">Book Seat</button>
-                    </form>
-                </div>
-            </div>
+      {/* Search */}
+      <div className="glass p-6 rounded-3xl bg-white border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Search className="text-primary" />
+          <h3 className="font-semibold text-gray-800">Search Your Trip</h3>
         </div>
-    );
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <input type="text" placeholder="From (San Jose)" className="px-5 py-4 rounded-2xl border border-gray-200 outline-none focus:ring-1 focus:ring-accent tap-target shadow-sm" />
+          <input type="text" placeholder="To (Batangas)" className="px-5 py-4 rounded-2xl border border-gray-200 outline-none focus:ring-1 focus:ring-accent tap-target shadow-sm" />
+          <button className="bg-accent hover:bg-green-700 text-white py-4 rounded-2xl font-bold shadow-md transition-all tap-target cursor-pointer">Search</button>
+        </div>
+      </div>
+
+      {/* Live Alerts */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3 mb-5">
+          <Bell className="text-orange-500" />
+          <h3 className="font-semibold text-gray-800">Live Alerts</h3>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="p-4 bg-orange-50 border-l-4 border-orange-500 text-orange-900 rounded-r-2xl font-medium">MV Maria Gloria - 45 mins delay due to weather</div>
+          <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-900 rounded-r-2xl font-medium">Van services from San Jose are on schedule</div>
+        </div>
+      </div>
+
+      {/* Available Trips */}
+      <div>
+        <h3 className="font-semibold mb-4 text-gray-800 text-lg">Available Trips</h3>
+        <div className="space-y-4">
+          {availableTrips.map((trip) => (
+            <div key={trip.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span className="text-4xl">{trip.type === "Ferry" ? "🚢" : "🚐"}</span>
+                <div>
+                  <p className="font-bold text-gray-800 text-lg">{trip.route}</p>
+                  <p className="text-sm font-medium text-gray-500">Departs at {trip.time}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-primary">₱{trip.price}</p>
+                <button 
+                  onClick={() => handleBook(trip)}
+                  className="mt-3 bg-primary hover:bg-blue-800 transition-colors text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-sm tap-target cursor-pointer"
+                >
+                  Book Now
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Live Map */}
+      <div className="rounded-3xl overflow-hidden shadow-sm border border-gray-200">
+        <div className="bg-primary text-white p-4">
+          <p className="font-bold flex items-center gap-2 tracking-wide">
+            <MapPin /> Live Transit Map
+          </p>
+        </div>
+        <MapContainer center={[12.35, 121.15]} zoom={10} style={{ height: '420px', width: '100%' }} className="z-10">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <Marker position={[12.35, 121.15]}>
+            <Popup>San Jose Port • Ferry Terminal</Popup>
+          </Marker>
+          <Marker position={[13.75, 121.05]}>
+            <Popup>Batangas Port • MV Maria Gloria (Delayed)</Popup>
+          </Marker>
+        </MapContainer>
+      </div>
+
+      {isSuperAdmin && (
+        <div className="text-center text-xs font-medium text-gray-500 py-6 border-t border-gray-200">
+          Super Admin Mode • You have full visibility across all roles
+        </div>
+      )}
+
+      <BookingModal 
+        isOpen={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        tripData={selectedTrip} 
+        type={selectedTrip?.type?.toLowerCase() || 'ferry'}
+        onConfirm={confirmBooking}
+      />
+    </div>
+  );
 };
