@@ -112,6 +112,16 @@ export const LoginScreen = () => {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-5 relative overflow-hidden font-sans">
       
+      {/* Subtle Mamburao, Occidental Mindoro Flag Background Watermark */}
+      <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.06] select-none">
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/e/e6/Flag_of_Mamburao%2C_Occidental_Mindoro.png" 
+          alt="Mamburao, Occidental Mindoro Flag" 
+          className="w-full max-w-4xl max-h-[80vh] object-contain"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+
       {/* Visual Background Glow Accents */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#003087]/15 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#FF8800]/15 rounded-full blur-[120px] pointer-events-none" />

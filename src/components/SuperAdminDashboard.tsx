@@ -70,6 +70,16 @@ export const SuperAdminDashboard = () => {
   return (
     <div className="min-h-screen bg-[#F0F4F8] flex flex-col relative pb-[64px] sm:pb-0">
       
+      {/* Subtle Mamburao, Occidental Mindoro Flag Background Watermark */}
+      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.07] select-none">
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/e/e6/Flag_of_Mamburao%2C_Occidental_Mindoro.png" 
+          alt="Mamburao, Occidental Mindoro Flag" 
+          className="w-full max-w-4xl max-h-[80vh] object-contain"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+      
       {/* 1. PERSISTENT TOP STATUS BAR (28px) */}
       <div
         className={`fixed top-0 left-0 right-0 h-[28px] z-[100] text-white text-xs font-bold leading-[28px] text-center transition-colors duration-500 shadow-sm ${

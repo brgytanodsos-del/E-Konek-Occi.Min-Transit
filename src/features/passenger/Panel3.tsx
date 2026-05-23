@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { WeatherWidget } from '../../components/WeatherWidget';
+import { motion, AnimatePresence } from 'motion/react';
+import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
 
 interface Panel3Props {
   isSuperAdmin: boolean;
@@ -46,6 +48,18 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   // Interactive pulse and countdowns
   const [refreshTimer, setRefreshTimer] = useState(30);
   const [pulseActive, setPulseActive] = useState(false);
+
+  // Local AI Voice Synthesis States
+  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>('feminine');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSpeed, setSpeechSpeed] = useState(0.9);
+
+  // Stop active broadcasting when leaving view
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+    };
+  }, []);
 
   // 30 seconds count refresh loop
   useEffect(() => {
@@ -95,6 +109,9 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     const initialPos = getTripLocation(activeTrip.id, activeTrip.route);
 
     if (!mapInstanceRef.current) {
+      if (trackMapRef.current) {
+        delete (trackMapRef.current as any)._leaflet_id;
+      }
       mapInstanceRef.current = L.map(trackMapRef.current, {
         zoomControl: true,
         scrollWheelZoom: false
@@ -129,7 +146,13 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       `).openPopup();
     }
 
-    return () => {};
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+    };
   }, [trackedTripId, trips]);
 
   // Submit Ferry Booking Form
@@ -234,14 +257,16 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     const tripObj = trips.find(t => t.id === trackedTripId);
 
     return (
-      <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex flex-col animate-fade-in relative text-[#2D3748]">
+      <div className="min-h-[calc(100vh-80px)] bg-slate-50/70 backdrop-blur-[2px] flex flex-col animate-fade-in relative text-slate-850">
         {/* Navigation bar */}
-        <div className="bg-[#003580] text-white p-4 flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📍</span>
+        <div className="bg-[#003087] text-white p-4 flex items-center justify-between shadow-md border-b-2 border-[#FF8800]">
+          <div className="flex items-center gap-3">
+            <span className="p-2 bg-white/10 rounded-xl text-yellow-300 animate-pulse text-sm">
+              <i className="fa-solid fa-satellite-dish"></i>
+            </span>
             <div>
-              <p className="font-bold text-sm tracking-tight">Active GPS Shuttle Tracker</p>
-              <p className="text-xs opacity-85">Centennial Highway Real-time Locator</p>
+              <p className="font-black text-xs sm:text-sm uppercase tracking-wider">Active GPS Vehicle Telemetry</p>
+              <p className="text-[10px] text-white/70 font-semibold">Centennial Highway Real-time Coordinates Feed</p>
             </div>
           </div>
           <button
@@ -249,9 +274,9 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
               setTrackedTripId(null);
               setEtaSeconds(15 * 60);
             }}
-            className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-xs font-bold transition focus:ring-2 focus:ring-[#FF6B00]"
+            className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150 focus:ring-2 focus ring-[#FF8800] active:scale-95 cursor-pointer"
           >
-            ❌ Close Tracking
+            <i className="fa-solid fa-circle-xmark mr-1"></i> Close Tracker
           </button>
         </div>
 
@@ -260,33 +285,42 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
 
         {/* Live Tracking Information Card */}
         {tripObj && (
-          <div className="bg-white border-t border-gray-100 p-5 rounded-t-3xl shadow-2xl space-y-4 max-w-lg mx-auto w-full">
-            <div className="flex justify-between items-center">
+          <div className="bg-white border-t-4 border-[#FF8800] p-6 rounded-t-3xl shadow-2xl space-y-4 max-w-lg mx-auto w-full absolute bottom-0 left-0 right-0 z-[1000] animate-slide-up">
+            <div className="flex justify-between items-start">
               <div>
-                <span className="bg-orange-50 text-orange-600 border border-orange-200 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded">
-                  {tripObj.type} Route Active
+                <span className="bg-[#003087]/10 text-[#003087] border border-[#003087]/20 text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full">
+                  {tripObj.type} Class Network
                 </span>
-                <h4 className="font-bold text-gray-800 mt-1">{tripObj.route}</h4>
+                <h4 className="font-black text-slate-800 text-base mt-2 flex items-center gap-1.5">
+                  <span className="text-[#FF8800]"><i className="fa-solid fa-route"></i></span>
+                  {tripObj.route}
+                </h4>
               </div>
-              <div className="bg-orange-50 px-3 py-1 rounded-xl text-right">
-                <span className="text-[9px] font-bold text-orange-400 block uppercase font-mono">Simulated Progress</span>
-                <span className="text-sm font-extrabold text-[#FF6B00] font-mono">{formatETA(etaSeconds)}</span>
+              <div className="bg-orange-50/80 border border-orange-200/50 px-3 py-1.5 rounded-2xl text-right">
+                <span className="text-[9px] font-black text-slate-500 block uppercase font-mono tracking-wider">Estimated Transit</span>
+                <span className="text-xs sm:text-sm font-black text-[#FF8800] font-mono">{formatETA(etaSeconds)}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs border-t border-dashed border-gray-100 pt-3">
-              <div>
-                <p className="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Driver</p>
-                <p className="font-bold text-gray-700 mt-0.5">{tripObj.driver}</p>
+            <div className="grid grid-cols-2 gap-3 text-xs border-t border-dashed border-slate-100 pt-3">
+              <div className="bg-slate-50 p-3 rounded-xl">
+                <p className="font-black text-slate-400 uppercase tracking-wider text-[9px]">Assigned Driver</p>
+                <p className="font-black text-slate-700 mt-1 flex items-center gap-1">
+                  <span className="text-slate-400"><i className="fa-solid fa-user-circle"></i></span>
+                  {tripObj.driver}
+                </p>
               </div>
-              <div>
-                <p className="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Seats Available</p>
-                <p className="font-bold text-teal-600 mt-0.5">{tripObj.available} remaining</p>
+              <div className="bg-slate-50 p-3 rounded-xl">
+                <p className="font-black text-slate-400 uppercase tracking-wider text-[9px]">Seats Capacity</p>
+                <p className="font-black text-[#009E49] mt-1 flex items-center gap-1 animate-pulse">
+                  <span><i className="fa-solid fa-chair text-emerald-500"></i></span>
+                  {tripObj.available} / {tripObj.capacity} Open
+                </p>
               </div>
             </div>
             
-            <p className="text-[10px] text-gray-400 text-center leading-normal">
-              Self-updating map positions and countdown triggers refresh every 3 seconds.
+            <p className="text-[10px] text-slate-400 text-center leading-normal font-medium bg-slate-50 py-1.5 rounded-lg border border-slate-100 uppercase tracking-wider">
+              🟢 Telematic map coordinate markers auto-refreshing every 3.0s
             </p>
           </div>
         )}
@@ -295,30 +329,60 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   }
 
   return (
-    <div className="p-6 space-y-8 animate-fade-in text-[#2D3748]">
+    <div className="p-6 space-y-8 animate-fade-in text-slate-800">
       
       {/* Wind Warning Banner */}
       {isWindAdvisory && (
-        <div className="bg-red-600 text-white px-5 py-3.5 rounded-3xl shadow-md border-2 border-red-500 animate-pulse flex items-center gap-3">
-          <span className="text-2xl">⚠️</span>
+        <div className="bg-rose-600 text-white px-5 py-4 rounded-3xl shadow-md border-2 border-rose-500 animate-pulse flex items-center gap-4">
+          <span className="text-3xl animate-bounce"><i className="fa-solid fa-triangle-exclamation"></i></span>
           <div>
-            <p className="font-semibold tracking-tight text-sm">WIND ADVISORY: High winds at Abra Port.</p>
-            <p className="text-xs opacity-90">Ferry voyages and vessel crossing schedules may suffer sudden delays or cancellations.</p>
+            <p className="font-black tracking-tight text-sm uppercase">Maritime Warning Code: High Winds Detected</p>
+            <p className="text-xs opacity-90 font-semibold">Abra Port wind gusts exceeded 30 km/h. Montenegro Shipping crossings are currently on precautionary advisory; schedules are subject to adjustments.</p>
           </div>
         </div>
       )}
 
-      {/* Hero Header */}
-      <div className="bg-gradient-to-br from-[#003580] to-[#002150] text-white p-6 sm:p-8 rounded-3xl shadow-xl space-y-3 relative overflow-hidden">
-        {/* Decorative Watermark */}
-        <div className="absolute right-0 bottom-0 text-[130px] select-none opacity-5 translate-x-12 translate-y-12 shrink-0">🚢</div>
+      {/* Hero Header - Montenegro Green & Grand Terminal Orange/Navy Unified Brand concept */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#003087] via-[#001D4E] to-[#011433] text-white p-6 sm:p-8 rounded-3xl shadow-xl space-y-4">
+        {/* Dynamic Watermark Background Patterns */}
+        <div className="absolute right-[-20px] bottom-[-20px] text-[180px] select-none opacity-5 translate-x-4 translate-y-4 font-black">
+          <i className="fa-solid fa-ship"></i>
+        </div>
         
-        <div className="relative">
-          <h1 className="text-3xl sm:text-4xl font-black font-sans tracking-tight">E-Konek Occi.Mindo Transit</h1>
-          <p className="text-[#FF6B00] font-extrabold text-sm sm:text-base tracking-widest uppercase mt-1">Montenegro Shipping & Mamburao Terminal</p>
-          <p className="text-white/80 text-xs sm:text-sm mt-3 max-w-md">
-            The unified transit passenger service center. Real-time boarding status, public seat allocations, and satellite shuttle gps locators.
-          </p>
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="space-y-2 max-w-lg">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-[#009E49] text-white border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                <i className="fa-solid fa-anchor text-yellow-300"></i> Montenegro Marine
+              </span>
+              <span className="bg-[#FF8800] text-white border border-orange-500/30 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                <i className="fa-solid fa-bus"></i> Mamburao Terminal
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black font-sans tracking-tight leading-none uppercase">
+              Mindoro<span className="text-[#FF8800]">Transit</span> HUB
+            </h1>
+            <p className="text-yellow-300 font-extrabold text-xs sm:text-sm tracking-widest uppercase font-sans">
+              E-Konek Passenger Self-Service Portal
+            </p>
+            <p className="text-white/80 text-xs sm:text-sm leading-relaxed font-semibold">
+              Seamlessly bridge Batangas Montenegro maritime sailings with Occidental Mindoro highway shuttle transport networks from a single digital screen.
+            </p>
+          </div>
+
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 shrink-0 w-full md:w-auto">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Connected Terminals Status</p>
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>Abra Pier: <b className="text-[#009E49]">LINKED</b></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                <span>Mamburao Hub: <b className="text-[#FF8800]">ONLINE</b></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -327,29 +391,144 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <WeatherWidget
             weatherData={abraWeather}
-            title="🎫 Abra Port Weather"
+            title="🎫 Abra Port Station"
             lastUpdated={abraWeather ? formatPST(abraWeather.lastUpdated) : ''}
             isOnline={isOnline}
           />
           <WeatherWidget
             weatherData={mamburaoWeather}
-            title="🚐 Mamburao Terminal Weather"
+            title="🚐 Mamburao Dispatch Station"
             lastUpdated={mamburaoWeather ? formatPST(mamburaoWeather.lastUpdated) : ''}
             isOnline={isOnline}
           />
         </div>
 
-        {/* Port Bulletins */}
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between">
+        {/* Port Bulletins & Local AI voice read-out system */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute -top-1 -right-1 w-16 h-16 pointer-events-none opacity-5 text-indigo-900 text-6xl">
+            <i className="fa-solid fa-bullhorn"></i>
+          </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 font-sans">📌 Current Port Announcement</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-indigo-500 font-sans flex items-center gap-1">
+                <span><i className="fa-solid fa-bullhorn text-indigo-400"></i></span> 
+                Live Bulletin Broadcast
+              </h4>
+              
+              {/* Voice indicator or active audio waves */}
+              {isSpeaking && (
+                <div className="flex items-end gap-0.5 h-3 px-1.5 py-0.5 bg-[#FF8800]/10 rounded-md">
+                  <div className="w-0.5 bg-[#FF8800] rounded-full animate-pulse h-1" />
+                  <div className="w-0.5 bg-[#FF8800] rounded-full animate-pulse h-2" />
+                  <div className="w-0.5 bg-[#FF8800] rounded-full animate-pulse h-1" />
+                </div>
+              )}
+            </div>
+            
             {recentAnnouncement ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm font-semibold text-gray-700 leading-relaxed italic">"{recentAnnouncement.text}"</p>
-                <p className="text-[10px] text-gray-400 font-medium">Published by: {recentAnnouncement.author} ({formatPST(recentAnnouncement.date)})</p>
+              <div className="mt-3 space-y-3">
+                <p className="text-xs sm:text-sm font-semibold text-slate-750 leading-relaxed italic border-l-2 border-indigo-200 pl-2">
+                  "{recentAnnouncement.text}"
+                </p>
+                
+                {/* Embedded Local Narrator PA Controls */}
+                <div className="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 space-y-2 text-[10px]">
+                  <div className="flex justify-between items-center font-bold text-slate-500 uppercase tracking-wide">
+                    <span>🎙️ Local AI Narration</span>
+                    {isSpeaking ? (
+                      <span className="text-[#FF8800] animate-pulse flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF8800] inline-block animate-ping" /> Broadcasting...
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Offline-capable System</span>
+                    )}
+                  </div>
+                  
+                  {/* Selectors for Profile */}
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      onClick={() => setVoiceProfile('feminine')}
+                      className={`py-1 rounded-lg border text-center transition-all ${
+                        voiceProfile === 'feminine'
+                          ? 'bg-[#003087] text-white border-[#003087] font-black'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ♀ Female
+                    </button>
+                    <button
+                      onClick={() => setVoiceProfile('masculine')}
+                      className={`py-1 rounded-lg border text-center transition-all ${
+                        voiceProfile === 'masculine'
+                          ? 'bg-[#003087] text-white border-[#003087] font-black'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ♂ Male
+                    </button>
+                    <button
+                      onClick={() => setVoiceProfile('robotic')}
+                      className={`py-1 rounded-lg border text-center transition-all ${
+                        voiceProfile === 'robotic'
+                          ? 'bg-[#003087] text-white border-[#003087] font-black'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🤖 Retro Bot
+                    </button>
+                  </div>
+                  
+                  {/* Speed & Speak actions */}
+                  <div className="flex gap-2 items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-500 font-bold">Speed:</span>
+                      <select
+                        value={speechSpeed}
+                        onChange={(e) => setSpeechSpeed(parseFloat(e.target.value))}
+                        className="bg-white border border-slate-200 rounded-md py-0.5 px-1 font-bold text-slate-600"
+                      >
+                        <option value="0.75">Slower (0.75x)</option>
+                        <option value="0.9">Normal (0.9x)</option>
+                        <option value="1.1">Faster (1.1x)</option>
+                      </select>
+                    </div>
+
+                    {isSpeaking ? (
+                      <button
+                        onClick={() => {
+                          stopSpeaking();
+                          setIsSpeaking(false);
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white font-extrabold px-3 py-1 rounded-lg flex items-center gap-1 transition-all uppercase tracking-wider text-[9px] cursor-pointer"
+                      >
+                        <i className="fa-solid fa-volume-xmark"></i> Stop
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsSpeaking(true);
+                          speakAnnouncement(recentAnnouncement.text, {
+                            profile: voiceProfile,
+                            rate: speechSpeed,
+                            onEnd: () => setIsSpeaking(false),
+                            onError: () => setIsSpeaking(false)
+                          });
+                        }}
+                        className="bg-[#009E49] hover:bg-[#00803B] text-white font-extrabold px-3 py-1 rounded-lg flex items-center gap-1 transition-all uppercase tracking-wider text-[9px] cursor-pointer"
+                      >
+                        <i className="fa-solid fa-volume-high animate-bounce"></i> Play Voice
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-50 pt-2 flex justify-between items-center text-[9px] text-slate-400 font-bold">
+                  <span>COUNTER: {recentAnnouncement.author}</span>
+                  <span>{formatPST(recentAnnouncement.date)}</span>
+                </div>
               </div>
             ) : (
-              <p className="text-xs text-gray-400 italic mt-3">No active service bulletins broadcasted.</p>
+              <p className="text-xs text-slate-400 italic mt-3 font-semibold">No active terminal fleet notices currently broadcasted.</p>
             )}
           </div>
         </div>
@@ -357,42 +536,58 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
 
       {/* DYNAMIC COUNTDOWN & SCHEDULE BOARDS */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-slate-100 p-5 rounded-3xl shadow-sm gap-4">
           <div>
-            <h3 className="font-bold text-base text-gray-800">📊 Live Terminal Departure Boards</h3>
-            <p className="text-xs text-gray-400">Times displayed in Philippine Standard Time (PST)</p>
+            <h3 className="font-extrabold text-base text-slate-800 tracking-tight flex items-center gap-1.5">
+              <span><i className="fa-solid fa-clock-rotate-left text-slate-400"></i></span>
+              Integrated Sea-to-Land Departures Terminal Board
+            </h3>
+            <p className="text-xs text-slate-400 font-semibold">Departure estimates synchronized under Philippine Standard Time (PST)</p>
           </div>
-          <div className="bg-orange-50 px-3 py-1 rounded-xl text-center">
-            <span className="text-[9px] font-bold text-orange-400 block uppercase font-mono">Auto Refresh</span>
-            <span className="text-xs font-extrabold text-[#FF6B00] font-mono">Refreshing in {refreshTimer}s...</span>
+          <div className="bg-slate-50 border border-slate-150 py-1.5 px-4 rounded-2xl flex items-center gap-3 shrink-0 self-stretch sm:self-auto text-center">
+            <div className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF8800]"></span>
+            </div>
+            <span className="text-xs font-black text-slate-755 font-mono">
+              Schedules refresh in <b className="text-[#FF8800]">{refreshTimer}s</b>
+            </span>
           </div>
         </div>
 
-        {/* Side-by-Side Departures Board */}
+        {/* Side-by-Side Departures Board with premium detailing */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          {/* Ferry departure board */}
-          <div className={`bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#FF6B00]' : ''}`}>
-            <h4 className="font-extrabold text-sm text-[#003580] uppercase tracking-wider mb-4">🚢 Montenegro Ferry Crossings</h4>
+          {/* Montenegro Ferry Crossings Board */}
+          <div className={`bg-white rounded-3xl p-6 border border-slate-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#009E49]' : ''}`}>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-3 mb-4">
+              <h4 className="font-black text-xs sm:text-sm text-[#003087] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-[#009E49]"><i className="fa-solid fa-ship"></i></span> 
+                Montenegro Marine Voyages
+              </h4>
+              <span className="text-[10px] font-black uppercase text-[#009E49] px-2 py-0.5 bg-[#009E49]/15 rounded-full">Abra Pier Dock</span>
+            </div>
             <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
               {ships.map((s) => (
-                <div key={s.id} className="flex justify-between items-center border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                  <div>
-                    <span className="font-bold text-gray-800 text-sm block">{s.name}</span>
-                    <span className="text-xs text-gray-500 font-medium">{s.route}</span>
-                    <span className="text-[9px] font-mono text-gray-400 block mt-0.5">{formatPST(s.depTime)}</span>
+                <div key={s.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
+                  <div className="space-y-1">
+                    <span className="font-black text-slate-800 text-sm block">{s.name}</span>
+                    <span className="text-xs text-[#003087] font-semibold flex items-center gap-1">
+                      <i className="fa-solid fa-map-pin text-[10px] text-slate-400"></i> {s.route}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(s.depTime)}</span>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1.5">
                     {s.available <= 0 ? (
-                      <span className="bg-orange-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-wider uppercase">FULL</span>
+                      <span className="bg-[#FF8800] text-white font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-widest">SOLD OUT</span>
                     ) : (
-                      <span className="text-xs text-teal-600 font-bold">{s.available} seats left</span>
+                      <span className="text-xs text-[#009E49] font-black">{s.available} / {s.capacity} Slots</span>
                     )}
 
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold font-semibold uppercase ${
-                      s.status === 'Boarding' ? 'bg-indigo-50 text-indigo-700' :
-                      s.status === 'Delayed' ? 'bg-red-50 text-red-600' :
-                      'bg-green-50 text-green-700'
+                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                      s.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
+                      s.status === 'Delayed' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-100'
                     }`}>
                       {s.status}
                     </span>
@@ -403,27 +598,35 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
           </div>
 
           {/* Shuttle departure board */}
-          <div className={`bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#FF6B00]' : ''}`}>
-            <h4 className="font-extrabold text-sm text-[#FF6B00] uppercase tracking-wider mb-4">🚐 Terminal Shuttle dispatches</h4>
+          <div className={`bg-white rounded-3xl p-6 border border-slate-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#FF8800]' : ''}`}>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-3 mb-4">
+              <h4 className="font-black text-xs sm:text-sm text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-[#FF8800]"><i className="fa-solid fa-truck-moving"></i></span> 
+                Grand Terminal Dispatches
+              </h4>
+              <span className="text-[10px] font-black uppercase text-amber-600 px-2 py-0.5 bg-amber-100/80 rounded-full">Shuttle / Bus</span>
+            </div>
             <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
               {trips.map((t) => (
-                <div key={t.id} className="flex justify-between items-center border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                  <div>
-                    <span className="font-bold text-gray-800 text-sm block">{t.driver}</span>
-                    <span className="text-xs text-gray-500 font-medium">{t.route}</span>
-                    <span className="text-[9px] font-mono text-gray-400 block mt-0.5">{formatPST(t.depTime)}</span>
+                <div key={t.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
+                  <div className="space-y-1">
+                    <span className="font-black text-slate-800 text-sm block">{t.driver}</span>
+                    <span className="text-xs text-slate-600 font-semibold flex items-center gap-1">
+                      <i className="fa-solid fa-location-arrow text-[10px] text-slate-400"></i> {t.route}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(t.depTime)}</span>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1.5">
                     {t.available <= 0 ? (
-                      <span className="bg-orange-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-wider uppercase">FULL</span>
+                      <span className="bg-[#FF8800] text-white font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-widest">FULL VEHICLE</span>
                     ) : (
-                      <span className="text-xs text-teal-600 font-bold">{t.available} seats left</span>
+                      <span className="text-xs text-slate-600 font-extrabold">{t.available} Available</span>
                     )}
 
-                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
-                      t.status === 'Boarding' ? 'bg-indigo-100 text-[#003580] animate-pulse' :
-                      t.status === 'Departed' ? 'bg-orange-50 text-[#FF6B00]' :
-                      'bg-green-100 text-green-700'
+                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                      t.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
+                      t.status === 'Departed' ? 'bg-amber-100 text-[#FF8800] border-amber-200' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-100'
                     }`}>
                       {t.status}
                     </span>
@@ -436,228 +639,324 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
         </div>
       </div>
 
-      {/* CONFIRMATION DIALOG / SWEET CARD */}
-      {bookingConfirmation && (
-        <div className="bg-emerald-50 border-2 border-emerald-500 p-6 rounded-3xl shadow-xl space-y-4 animate-fade-in relative">
-          <button
-            onClick={() => setBookingConfirmation(null)}
-            className="absolute top-4 right-5 text-emerald-800 text-xl font-bold cursor-pointer"
+      {/* CONFIRMATION DIALOG / SWEET CARD (Styled elegantly as Boarding Pass Ticket format) */}
+      <AnimatePresence>
+        {bookingConfirmation && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-emerald-50/75 border-2 border-[#009E49] p-6 rounded-3xl shadow-xl space-y-4 relative overflow-hidden"
           >
-            &times;
-          </button>
-          
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">✅</span>
-            <div>
-              <h4 className="font-extrabold text-emerald-800 text-lg">Booking Submitted!</h4>
-              <p className="text-xs text-emerald-600 font-medium">Successfully processed ticket reservation request.</p>
+            {/* Top decorative visual logo watermark */}
+            <div className="absolute top-4 right-12 text-6xl opacity-[0.03] select-none text-emerald-950">
+              <i className="fa-solid fa-anchor"></i>
             </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-emerald-100 space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px]">Booking Type</span>
-              <span className="font-bold text-gray-700">{bookingConfirmation.type}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px]">Transit Vessel/Vehicle</span>
-              <span className="font-bold text-gray-700">{bookingConfirmation.targetName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 uppercase tracking-wider font-bold text-[9px]">Route Details</span>
-              <span className="font-bold text-gray-700">{bookingConfirmation.route}</span>
-            </div>
-            <div className="flex justify-between border-t border-dashed border-gray-100 pt-2 mt-1">
-              <span className="text-[#FF6B00] uppercase tracking-wider font-black text-[10px]">Reference Number</span>
-              <span className="font-mono font-black text-sm text-gray-800">{bookingConfirmation.id.toUpperCase()}</span>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            {!bookingConfirmation.isFerry && (
-              <button
-                onClick={() => {
-                  setTrackedTripId(bookingConfirmation.tripId);
-                  setBookingConfirmation(null);
-                }}
-                className="flex-1 bg-[#FF6B00] hover:bg-orange text-white font-bold py-3 rounded-2xl text-xs shadow transition active:scale-95"
-              >
-                📍 Track My Shuttle Ride
-              </button>
-            )}
             <button
               onClick={() => setBookingConfirmation(null)}
-              className="px-6 py-3 bg-white hover:bg-gray-100 border border-emerald-200 text-emerald-800 font-semibold rounded-2xl text-xs transition active:scale-95"
+              className="absolute top-4 right-5 text-emerald-800 text-2xl font-black cursor-pointer hover:bg-emerald-100 rounded-lg w-8 h-8 flex items-center justify-center transition-all"
             >
-              Okay
+              &times;
             </button>
-          </div>
-        </div>
-      )}
+            
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 bg-[#009E49]/15 rounded-2xl text-[#009E49] text-xl">
+                <i className="fa-solid fa-ticket-alt text-xl"></i>
+              </span>
+              <div>
+                <h4 className="font-black text-emerald-800 text-base uppercase">Passage Voucher Ready!</h4>
+                <p className="text-xs text-emerald-600 font-semibold">Self-service ticket reservation has been recorded successfully.</p>
+              </div>
+            </div>
+
+            {/* High Fidelity Boarding Voucher Frame */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-inner overflow-hidden max-w-xl mx-auto divide-y-2 divide-dashed divide-slate-150">
+              {/* Receipt Header */}
+              <div className="p-4 bg-slate-50 flex justify-between items-center text-xs">
+                <div>
+                  <p className="font-black text-slate-800 uppercase tracking-wider text-[9px]">{bookingConfirmation.isFerry ? 'Montenegro Shipping Vessel' : 'Mamburao Hub Shuttle'}</p>
+                  <p className="font-extrabold text-[#003087] mt-0.5">{bookingConfirmation.targetName}</p>
+                </div>
+                <div className="text-right">
+                  <span className="bg-[#009E49] text-white text-[9px] font-black px-2.5 py-1 rounded-full">{bookingConfirmation.isFerry ? 'FERRY PASS' : 'LAND PASS'}</span>
+                </div>
+              </div>
+
+              {/* Receipt Details */}
+              <div className="p-4 grid grid-cols-2 gap-4 text-xs font-semibold">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Passenger Profile</p>
+                  <p className="text-slate-800 font-black text-sm mt-1">{bookingConfirmation.passenger}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Route Network</p>
+                  <p className="text-[#003087] font-black mt-1">{bookingConfirmation.route}</p>
+                </div>
+              </div>
+
+              {/* Receipt Footer with Reference codes */}
+              <div className="p-4 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                  <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black">Check-in Reference Code</p>
+                  <p className="font-mono font-black text-sm sm:text-base text-slate-800 uppercase tracking-wider mt-0.5">
+                    {bookingConfirmation.id.toUpperCase()}
+                  </p>
+                </div>
+
+                {/* Simulated QR block */}
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${bookingConfirmation.id}`} 
+                    alt="Booking QR"
+                    className="w-12 h-12 bg-white p-1 border border-slate-200 rounded shadow-sm"
+                  />
+                  <div className="text-[9px] text-slate-400 font-semibold max-w-[120px] leading-tight">
+                    Show QR counter reader at Mamburao checkpoint terminal.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 pt-2 max-w-xl mx-auto">
+              {!bookingConfirmation.isFerry && (
+                <button
+                  onClick={() => {
+                    setTrackedTripId(bookingConfirmation.tripId);
+                    setBookingConfirmation(null);
+                  }}
+                  className="flex-1 bg-[#FF8800] hover:bg-[#E07700] text-white font-black py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-md transition-all border-b-4 border-orange-850 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i className="fa-solid fa-circle-play animate-pulse text-yellow-300"></i> Track My Shuttle GPS Location
+                </button>
+              )}
+              <button
+                onClick={() => setBookingConfirmation(null)}
+                className="px-6 py-3.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer"
+              >
+                Okay
+              </button>
+            </div>
+            
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* BOX FOR BOOKING TICKETS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Book Ferry Form */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-          <h3 className="font-bold text-lg text-[#003580] font-sans">🚢 Book Ferry Ticket</h3>
-          <form onSubmit={handleFerryBookingSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Select Voyage</label>
-              <select
-                value={voyageId}
-                onChange={(e) => setVoyageId(e.target.value)}
-                required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003580]"
-              >
-                <option value="">-- Choose Active Voyage --</option>
-                {ships
-                  .filter(s => (s.status === 'Scheduled' || s.status === 'Boarding') && s.available > 0)
-                  .map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.route}) - {s.available} left</option>
-                  ))}
-              </select>
-            </div>
+        {/* Book Ferry Form - Montenegro concept styling */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          {/* Montenegro visual branding bar */}
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-[#009E49]" />
 
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-base text-[#003087] tracking-tight flex items-center gap-2">
+              <span className="text-[#009E49]"><i className="fa-solid fa-ship"></i></span>
+              Montenegro Marine Voyage Reservation
+            </h3>
+            <p className="text-xs text-slate-400 font-semibold">Reserve priority crossing slots. Pay cash at the Abra de Ilog Ticketing Port Counter.</p>
+            
+            <form onSubmit={handleFerryBookingSubmit} className="space-y-4 pt-2">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Passenger Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Maria Clara"
-                  value={ferryName}
-                  onChange={(e) => setFerryName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Contact Number</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 0917-123-4567"
-                  value={ferryContact}
-                  onChange={(e) => setFerryContact(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Ticket Type Allocation</label>
-              <select
-                value={ticketType}
-                onChange={(e) => setTicketType(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              >
-                <option value="Regular">Regular (₱500)</option>
-                <option value="Student">Student (₱350)</option>
-                <option value="Senior">Senior Citizen (₱300)</option>
-                <option value="PWD">PWD (₱300)</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-[#003580] hover:bg-navy text-white font-bold py-3.5 rounded-2xl shadow active:scale-95 transition"
-            >
-              {isOnline ? 'Process Ticket Booking' : '📴 Queue Ticket Offline'}
-            </button>
-          </form>
-        </div>
-
-        {/* Book Shuttle Form */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-          <h3 className="font-bold text-lg text-[#FF6B00] font-sans">🚐 Book Terminal Shuttle</h3>
-          <form onSubmit={handleLandBookingSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Select Shuttle Trip</label>
-              <select
-                value={tripId}
-                onChange={(e) => setTripId(e.target.value)}
-                required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]"
-              >
-                <option value="">-- Choose Shuttle dispatch --</option>
-                {trips
-                  .filter(t => (t.status === 'Scheduled' || t.status === 'Boarding') && t.available > 0)
-                  .map(t => (
-                    <option key={t.id} value={t.id}>{t.route} ({t.type} - {t.driver}) - {t.available} seats</option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1 font-sans">Passenger Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Cardo Dalisay"
-                  value={shuttleName}
-                  onChange={(e) => setShuttleName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Contact Number</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 0920-111-2222"
-                  value={shuttleContact}
-                  onChange={(e) => setShuttleContact(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Pickup Point</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mamburao Terminal / Plaza"
-                  value={pickupPoint}
-                  onChange={(e) => setPickupPoint(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Seats Count</label>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Select Voyage Schedule</label>
                 <select
-                  value={seatsCount}
-                  onChange={(e) => setSeatsCount(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
+                  value={voyageId}
+                  onChange={(e) => setVoyageId(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#003087] cursor-pointer"
                 >
-                  {[...Array(10)].map((_, i) => (
-                    <option key={i+1} value={i+1}>{i+1} seat{i > 0 ? 's' : ''}</option>
-                  ))}
+                  <option value="">-- Choose Active Crossing Voyage --</option>
+                  {ships
+                    .filter(s => (s.status === 'Scheduled' || s.status === 'Boarding') && s.available > 0)
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.route}) - {s.available} spaces left</option>
+                    ))}
                 </select>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              className="w-full bg-[#FF6B00] hover:bg-orange text-white font-bold py-3.5 rounded-2xl shadow active:scale-95 transition"
-            >
-              {isOnline ? 'Confirm Shuttle Reservation' : '📴 Queue Shuttle Offline'}
-            </button>
-          </form>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Passenger Full Name</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400 text-xs"><i className="fa-solid fa-user"></i></span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Maria dela Cruz"
+                      value={ferryName}
+                      onChange={(e) => setFerryName(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Contact Number</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400 text-xs"><i className="fa-solid fa-phone"></i></span>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 09171234567"
+                      value={ferryContact}
+                      onChange={(e) => setFerryContact(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Passage Category Ticket</label>
+                <select
+                  value={ticketType}
+                  onChange={(e) => setTicketType(e.target.value)}
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#003087] cursor-pointer"
+                >
+                  <option value="Regular">Regular Class (₱500)</option>
+                  <option value="Student">Student (₱350)</option>
+                  <option value="Senior">Senior Citizen (₱300)</option>
+                  <option value="PWD">PWD Discounted (₱300)</option>
+                </select>
+              </div>
+            </form>
+          </div>
+
+          <button
+            onClick={handleFerryBookingSubmit}
+            className="w-full mt-6 bg-[#009E49] hover:bg-emerald-700 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider shadow-md transition hover:shadow-lg focus:ring-2 focus:ring-emerald-500 active:scale-95 flex items-center justify-center gap-2 cursor-pointer border-b-4 border-emerald-850"
+          >
+            {isOnline ? (
+              <>
+                <i className="fa-solid fa-file-invoice text-yellow-300"></i> Reserve Crossing Ticket
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-cloud-arrow-down"></i> Queue Vessel Booking Offline
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Book Shuttle Form - Mamburao concept styling */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          {/* Mamburao visual branding bar */}
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-[#FF8800]" />
+
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-base text-slate-800 tracking-tight flex items-center gap-2">
+              <span className="text-[#FF8800]"><i className="fa-solid fa-bus"></i></span>
+              Mamburao Hub Shuttle Seat Reservation
+            </h3>
+            <p className="text-xs text-slate-400 font-semibold">Pre-book land dispatch shuttle seats on Occidental highways. Real-time fleet tracking available.</p>
+            
+            <form onSubmit={handleLandBookingSubmit} className="space-y-4 pt-2">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Select Airport/Dispatch Bus</label>
+                <select
+                  value={tripId}
+                  onChange={(e) => setTripId(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#FF8800] cursor-pointer"
+                >
+                  <option value="">-- Choose Shuttle Dispatch Trip --</option>
+                  {trips
+                    .filter(t => (t.status === 'Scheduled' || t.status === 'Boarding') && t.available > 0)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.route} ({t.type} class) - {t.available} seats left</option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Passenger Full Name</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400 text-xs"><i className="fa-solid fa-user"></i></span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Cardo Dalisay"
+                      value={shuttleName}
+                      onChange={(e) => setShuttleName(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Contact Number</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400 text-xs"><i className="fa-solid fa-phone"></i></span>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 09201112222"
+                      value={shuttleContact}
+                      onChange={(e) => setShuttleContact(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Boarding/Pickup Point</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-slate-400 text-[10px]"><i className="fa-solid fa-location-arrow"></i></span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Terminal Plaza"
+                      value={pickupPoint}
+                      onChange={(e) => setPickupPoint(e.target.value)}
+                      className="w-full border border-slate-200 rounded-2xl pl-9 pr-3 py-2.5 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Seats Count</label>
+                  <select
+                    value={seatsCount}
+                    onChange={(e) => setSeatsCount(e.target.value)}
+                    className="w-full border border-slate-200 rounded-2xl px-2 py-2.5 text-xs font-semibold focus:outline-none cursor-pointer"
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <option key={i+1} value={i+1}>{i+1}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <button
+            onClick={handleLandBookingSubmit}
+            className="w-full mt-6 bg-[#FF8800] hover:bg-[#E07700] text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider shadow-md transition hover:shadow-lg focus:ring-2 focus:ring-orange-500 active:scale-95 flex items-center justify-center gap-2 cursor-pointer border-b-4 border-orange-850"
+          >
+            {isOnline ? (
+              <>
+                <i className="fa-solid fa-receipt text-yellow-300"></i> Reserve Shuttle Seats
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-cloud-arrow-down"></i> Queue Shuttle Booking Offline
+              </>
+            )}
+          </button>
         </div>
 
       </div>
 
       {/* Floating Offline pending bookings sync badge */}
       {offlineQueue.length > 0 && (
-        <div className="fixed bottom-4 left-4 z-40 bg-orange-600 text-white font-black px-4 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-bounce">
-          <span className="text-xl">📥</span>
-          <span className="text-xs uppercase tracking-wider font-mono font-extrabold">{offlineQueue.length} bookings pending sync</span>
+        <div className="fixed bottom-4 left-4 z-40 bg-[#FF8800] border-2 border-white text-white font-black px-4 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-bounce">
+          <span className="text-sm"><i className="fa-solid fa-cloud-arrow-down"></i></span>
+          <span className="text-[10px] uppercase tracking-wider font-mono font-black">{offlineQueue.length} Bookings awaiting synchronization</span>
         </div>
       )}
 
     </div>
   );
 };
+
