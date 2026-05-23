@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AppProvider } from './context/AppContext';
 import { LoginScreen } from './components/LoginScreen';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
-import { AppProvider } from './context/AppContext';
 
 export default function App() {
   return (
@@ -22,6 +22,7 @@ const LoginScreenWrapper = () => {
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
 
   if (isLoggedIn) {
+     // For demo purposes, we will handle the redirect within the App structure
     window.location.href = '/dashboard';
     return null;
   }
