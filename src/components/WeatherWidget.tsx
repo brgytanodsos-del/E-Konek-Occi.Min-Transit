@@ -16,27 +16,19 @@ export const WeatherWidget = ({ weatherData, title }: WeatherWidgetProps) => {
         return { label: 'Cloudy', icon: '☁️' };
     };
 
-    if (!weatherData) return <div className="p-4 bg-white rounded-lg shadow animate-pulse h-24"></div>;
+    if (!weatherData) return <div className="p-5 bg-gradient-to-br from-blue-500 to-navy rounded-2xl shadow-lg animate-pulse h-full min-h-[100px]"></div>;
 
     const details = getWeatherDetails(weatherData.weathercode);
     const isHighWind = weatherData.windspeed_10m > 30;
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-navy flex flex-col justify-between h-full">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h4 className="text-xs font-bold text-gray-500 uppercase">{title}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-3xl">{details.icon}</span>
-                        <div>
-                            <p className="text-xl font-bold text-navy">{Math.round(weatherData.temperature_2m)}°C</p>
-                            <p className="text-xs text-gray-600">{details.label}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-xs text-gray-500">Wind</p>
-                    <p className={`text-sm font-bold ${isHighWind ? 'text-red-600' : 'text-gray-800'}`}>{weatherData.windspeed_10m} km/h</p>
+        <div className="bg-gradient-to-br from-blue-500 to-navy rounded-2xl shadow-lg p-5 text-white flex flex-col md:flex-row items-center gap-4 h-full">
+            <div className="text-4xl">{details.icon}</div>
+            <div className="flex-1 w-full text-center md:text-left">
+                <div className="text-sm font-medium opacity-80 uppercase tracking-tighter">{title}</div>
+                <div className="text-2xl font-black">{Math.round(weatherData.temperature_2m)}°C <span className="text-base font-medium opacity-90 mx-1">—</span> {details.label}</div>
+                <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isHighWind ? 'text-red-300' : 'opacity-70'}`}>
+                    Wind: {weatherData.windspeed_10m} km/h
                 </div>
             </div>
         </div>

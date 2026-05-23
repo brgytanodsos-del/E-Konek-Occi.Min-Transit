@@ -31,16 +31,8 @@ export const MapView = ({ center, zoom = 11, markers = [], liveUpdate = false }:
         } else if (mapInstance.current) {
             mapInstance.current.setView(center, zoom);
         }
-
-        // Cleanup on unmount
-        return () => {
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        // No cleanup here to avoid destroying map instance on re-renders
+    }, [center, zoom, markers]);
 
     // Effect to handle marker updates (and simulate live tracking gracefully)
     useEffect(() => {
