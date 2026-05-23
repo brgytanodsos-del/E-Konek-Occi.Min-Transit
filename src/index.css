@@ -2,8 +2,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy: #1e293b;
-  --color-orange: #f97316;
+  --color-primary: #003087;
+  --color-accent: #00A651;
+  --color-warning: #FF8800;
+  --color-dark: #0F172A;
+  
+  /* Legacy mapping for panels */
+  --color-navy: #003087;
+  --color-orange: #FF8800;
+  --color-origin-orange: #FF8800;
+  
   --color-bglight: #f8fafc;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -25,10 +33,28 @@
   scrollbar-width: none;
 }
 
+:root {
+  --primary: #003087;
+  --accent: #00A651;
+  --warning: #FF8800;
+  --dark: #0F172A;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-bglight);
   -webkit-tap-highlight-color: transparent;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 48, 135, 0.1);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(0, 166, 81, 0.2);
 }
 
 /* Print Styles for Ticket */

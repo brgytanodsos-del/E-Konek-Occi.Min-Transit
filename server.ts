@@ -38,9 +38,9 @@ async function startServer() {
       const firecrawlApp = new FirecrawlApp({ apiKey });
 
       // In a real scenario, we might scrape a specific shipping site
-      const scrapeResult = await firecrawlApp.scrapeUrl('https://montenegroshipping.com/schedules', {
+      const scrapeResult = await (firecrawlApp as any).scrapeUrl('https://montenegroshipping.com/schedules', {
         formats: ['markdown']
-      });
+      } as any);
 
       if (!scrapeResult.success) {
         throw new Error("Failed to scrape data");

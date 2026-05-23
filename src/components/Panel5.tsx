@@ -1,6 +1,24 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 
+export const addTripToCalendar = async (accessToken: string, summary: string, description: string, startTime: string, endTime: string) => {
+    try {
+        const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                summary,
+                description,
+                start: { dateTime: new Date(startTime).toISOString() },
+                end: { dateTime: new Date(endTime).toISOString() }
+            })
+        });
+        return await res.json();
+    } catch (e) {
+        console.error("Calendar Sync Error: ", e);
+    }
+};
+
 export const Panel5 = () => {
     const context = useContext(AppContext);
     if (!context) return null;

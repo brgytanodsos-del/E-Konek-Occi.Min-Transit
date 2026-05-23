@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { WeatherWidget } from './WeatherWidget';
-import { MapView } from './MapView';
-import { generateId } from '../context/AppContext';
+import { AppContext } from '../../context/AppContext';
+import { WeatherWidget } from '../WeatherWidget';
+import { MapView } from '../MapView';
+import { generateId } from '../../context/AppContext';
+import { addTripToCalendar } from '../Panel5';
 
-export const Panel3 = () => {
+export const Panel3 = ({ isSuperAdmin }: { isSuperAdmin?: boolean }) => {
     const context = useContext(AppContext);
     if (!context) return null;
     const { ships, setShips, trips, setTrips, ferryBookings, setFerryBookings, vanBookings, setVanBookings, announcements, abraWeather, mamburaoWeather } = context;
@@ -86,6 +87,32 @@ export const Panel3 = () => {
 
     const actualVanBooking = bookingSuccess && bookingSuccess.type === 'Van' ? vanBookings.find(b => b.id === bookingSuccess.ref) : null;
     const isVanConfirmed = actualVanBooking?.status === 'Confirmed';
+    
+    const actualFerryBooking = bookingSuccess && bookingSuccess.type === 'Ferry' ? ferryBookings.find(b => b.id === bookingSuccess.ref) : null;
+    const isFerryConfirmed = actualFerryBooking?.status === 'Confirmed';
+
+    const [syncedIds, setSyncedIds] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (bookingSuccess && context.accessToken) {
+            const id = bookingSuccess.ref;
+            if (!syncedIds.includes(id)) {
+                if (bookingSuccess.type === 'Van' && isVanConfirmed && actualVanBooking) {
+                    const trip = trips.find(t => t.id === actualVanBooking.tripId);
+                    if (trip && trip.depTime) {
+                        addTripToCalendar(context.accessToken, `Van Trip: ${trip.route}`, `Pickup at: ${actualVanBooking.pickup}`, trip.depTime, new Date(new Date(trip.depTime).getTime() + 7200000).toISOString());
+                        setSyncedIds(prev => [...prev, id]);
+                    }
+                } else if (bookingSuccess.type === 'Ferry' && isFerryConfirmed && actualFerryBooking) {
+                    const ship = ships.find(s => s.id === actualFerryBooking.shipId);
+                    if (ship && ship.depTime && ship.arrTime) {
+                        addTripToCalendar(context.accessToken, `Ferry Voyage: ${ship.route}`, `Vessel: ${ship.name}`, ship.depTime, ship.arrTime);
+                        setSyncedIds(prev => [...prev, id]);
+                    }
+                }
+            }
+        }
+    }, [bookingSuccess, isVanConfirmed, isFerryConfirmed, actualVanBooking, actualFerryBooking, context.accessToken, syncedIds, trips, ships]);
 
     return (
         <div className="pb-20 max-w-7xl mx-auto">

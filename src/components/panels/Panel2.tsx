@@ -1,10 +1,10 @@
 import React, { useState, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { WeatherWidget } from './WeatherWidget';
-import { MapView } from './MapView';
-import { generateId } from '../context/AppContext';
+import { AppContext } from '../../context/AppContext';
+import { WeatherWidget } from '../WeatherWidget';
+import { MapView } from '../MapView';
+import { generateId } from '../../context/AppContext';
 
-export const Panel2 = () => {
+export const Panel2 = ({ isSuperAdmin }: { isSuperAdmin?: boolean }) => {
     const context = useContext(AppContext);
     if (!context) return null;
     const { trips, setTrips, vanBookings, setVanBookings, ships, mamburaoWeather } = context;
@@ -12,6 +12,8 @@ export const Panel2 = () => {
     const [newTrip, setNewTrip] = useState({ route: '', depTime: '', type: 'Van', driver: '', capacity: '' });
     const [activeTab, setActiveTab] = useState('map'); 
     const [trackBooking, setTrackBooking] = useState<any>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
 
     const handleAddTrip = (e: React.FormEvent) => {
         e.preventDefault();
@@ -251,29 +253,42 @@ export const Panel2 = () => {
                                         <span className="w-2 h-2 bg-orange animate-pulse rounded-full shadow-[0_0_8px_rgba(255,107,0,0.8)]"></span> LIVE
                                     </span>
                                     <button 
+                                        disabled={isSyncing}
                                         onClick={async () => {
                                             const newLogId = generateId();
                                             context.setNetworkLogs(prev => [...prev, { id: newLogId, type: 'Crawl Request', path: '/api/sync-ships', method: 'POST', status: 202, time: 'Just now' }]);
+                                            setIsSyncing(true);
+                                            setSyncError(null);
                                             try {
                                                 const res = await fetch('/api/sync-ships', { method: 'POST' });
+                                                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                                                 const data = await res.json();
                                                 context.setNetworkLogs(prev => prev.map(l => l.id === newLogId ? { ...l, status: 200 } : l));
                                                 if (data.ships) {
                                                     context.setShips(data.ships);
                                                 }
                                                 alert(data.message);
-                                            } catch (err) {
+                                            } catch (err: any) {
                                                 context.setNetworkLogs(prev => prev.map(l => l.id === newLogId ? { ...l, status: 500 } : l));
+                                                setSyncError(err.message || "Failed to sync via Firecrawl.");
                                                 alert("Failed to sync via Firecrawl.");
+                                            } finally {
+                                                setIsSyncing(false);
                                             }
                                         }}
-                                        className="bg-orange hover:bg-orange/90 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors tap-target"
+                                        className={`${isSyncing ? 'bg-orange/50 cursor-not-allowed' : 'bg-orange hover:bg-orange/90'} text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors tap-target flex items-center gap-2`}
                                     >
-                                        Scrape Schedule
+                                        {isSyncing ? (
+                                            <>
+                                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                                Syncing...
+                                            </>
+                                        ) : 'Scrape Schedule'}
                                     </button>
                                 </div>
                             </div>
                             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Read-only feed to time van/bus routes with ferry arrivals. Uses Firecrawl API.</p>
+                            {syncError && <p className="text-xs font-bold text-red-500 mt-2 px-5 py-2 bg-red-50 rounded mt-2">{syncError}</p>}
                         </div>
                         <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
