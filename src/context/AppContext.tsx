@@ -1,5 +1,20 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Ship, Trip, FerryBooking, VanBooking, Announcement, WeatherData } from '../types';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const provider = new GoogleAuthProvider();
+provider.addScope('https://www.googleapis.com/auth/docs');
+provider.addScope('https://www.googleapis.com/auth/calendar');
+provider.addScope('https://www.googleapis.com/auth/forms');
+provider.addScope('https://www.googleapis.com/auth/tasks');
+
+let isSigningIn = false;
+let cachedAccessToken: string | null = null;
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -41,6 +56,15 @@ const GPS_ROUTES: Record<string, [number, number][]> = {
     ]
 };
 
+export interface NetworkLog {
+    id: string;
+    type: string;
+    path: string;
+    method: string;
+    status: number;
+    time: string;
+}
+
 export interface AppContextType {
     ships: Ship[];
     setShips: React.Dispatch<React.SetStateAction<Ship[]>>;
@@ -52,9 +76,18 @@ export interface AppContextType {
     setVanBookings: React.Dispatch<React.SetStateAction<VanBooking[]>>;
     announcements: Announcement[];
     setAnnouncements: React.Dispatch<React.SetStateAction<Announcement[]>>;
+    networkLogs: NetworkLog[];
+    setNetworkLogs: React.Dispatch<React.SetStateAction<NetworkLog[]>>;
     getTripLocation: (routeStr: string) => [number, number];
     abraWeather: WeatherData | null;
     mamburaoWeather: WeatherData | null;
+    
+    // Auth
+    user: User | null;
+    accessToken: string | null;
+    needsAuth: boolean;
+    login: () => Promise<void>;
+    logout: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -65,7 +98,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [ferryBookings, setFerryBookings] = useState<FerryBooking[]>(MOCK_FERRY_BOOKINGS);
     const [vanBookings, setVanBookings] = useState<VanBooking[]>(MOCK_VAN_BOOKINGS);
     const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
-    
+    const [networkLogs, setNetworkLogs] = useState<NetworkLog[]>([]);
+
     // GPS Tick is kept isolated to the interval to prevent entire app re-rendering.
     // However, the location fetching uses it. To prevent constant re-renders across the
     // whole context, we move the GPS tick to a ref, and let components asking for position
@@ -74,6 +108,59 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // but pass it functionally so we only compute it when needed, preventing all components from
     // re-rendering unless they actively query it.
     
+    const [user, setUser] = useState<User | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [needsAuth, setNeedsAuth] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                if (cachedAccessToken) {
+                    setUser(currentUser);
+                    setAccessToken(cachedAccessToken);
+                    setNeedsAuth(false);
+                } else if (!isSigningIn) {
+                    cachedAccessToken = null;
+                    setUser(null);
+                    setAccessToken(null);
+                    setNeedsAuth(true);
+                }
+            } else {
+                cachedAccessToken = null;
+                setUser(null);
+                setAccessToken(null);
+                setNeedsAuth(true);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const login = async () => {
+        try {
+            isSigningIn = true;
+            const result = await signInWithPopup(auth, provider);
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (credential?.accessToken) {
+                cachedAccessToken = credential.accessToken;
+                setAccessToken(credential.accessToken);
+            }
+            setUser(result.user);
+            setNeedsAuth(false);
+        } catch (error) {
+            console.error('Sign in error:', error);
+        } finally {
+            isSigningIn = false;
+        }
+    };
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        cachedAccessToken = null;
+        setAccessToken(null);
+        setUser(null);
+        setNeedsAuth(true);
+    };
+
     const gpsTick = React.useRef(0);
 
     useEffect(() => {
@@ -114,14 +201,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return route[gpsTick.current % route.length];
     };
 
-    const value = {
+    const value: AppContextType = {
         ships, setShips,
         trips, setTrips,
         ferryBookings, setFerryBookings,
         vanBookings, setVanBookings,
         announcements, setAnnouncements,
+        networkLogs, setNetworkLogs,
         getTripLocation,
-        abraWeather, mamburaoWeather
+        abraWeather, mamburaoWeather,
+        user, accessToken, needsAuth, login, logout: handleLogout
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

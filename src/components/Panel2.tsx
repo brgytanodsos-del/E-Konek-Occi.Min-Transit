@@ -244,13 +244,36 @@ export const Panel2 = () => {
                 {activeTab === 'sync' && (
                     <div className="bg-white rounded-2xl shadow-sm border border-orange overflow-hidden flex flex-col">
                         <div className="p-5 border-b border-orange/20 bg-orange/5">
-                            <div className="flex justify-between items-center mb-1">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-1 gap-2">
                                 <h2 className="font-black text-navy uppercase tracking-tight">Montenegro Shipping Line Sync</h2>
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-orange uppercase tracking-wider">
-                                    <span className="w-2 h-2 bg-orange animate-pulse rounded-full shadow-[0_0_8px_rgba(255,107,0,0.8)]"></span> LIVE
-                                </span>
+                                <div className="flex items-center gap-3">
+                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-orange uppercase tracking-wider">
+                                        <span className="w-2 h-2 bg-orange animate-pulse rounded-full shadow-[0_0_8px_rgba(255,107,0,0.8)]"></span> LIVE
+                                    </span>
+                                    <button 
+                                        onClick={async () => {
+                                            const newLogId = generateId();
+                                            context.setNetworkLogs(prev => [...prev, { id: newLogId, type: 'Crawl Request', path: '/api/sync-ships', method: 'POST', status: 202, time: 'Just now' }]);
+                                            try {
+                                                const res = await fetch('/api/sync-ships', { method: 'POST' });
+                                                const data = await res.json();
+                                                context.setNetworkLogs(prev => prev.map(l => l.id === newLogId ? { ...l, status: 200 } : l));
+                                                if (data.ships) {
+                                                    context.setShips(data.ships);
+                                                }
+                                                alert(data.message);
+                                            } catch (err) {
+                                                context.setNetworkLogs(prev => prev.map(l => l.id === newLogId ? { ...l, status: 500 } : l));
+                                                alert("Failed to sync via Firecrawl.");
+                                            }
+                                        }}
+                                        className="bg-orange hover:bg-orange/90 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors tap-target"
+                                    >
+                                        Scrape Schedule
+                                    </button>
+                                </div>
                             </div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Read-only feed to time van/bus routes with ferry arrivals.</p>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Read-only feed to time van/bus routes with ferry arrivals. Uses Firecrawl API.</p>
                         </div>
                         <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
