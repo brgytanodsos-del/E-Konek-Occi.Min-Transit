@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 const ROLE_PINS: Record<string, string | null> = {
@@ -20,11 +21,13 @@ export const LoginScreen = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const { setCurrentRole, setIsAuthenticated } = useApp();
+  const navigate = useNavigate();
 
   const handleRoleSelect = (role: string) => {
     if (ROLE_PINS[role] === null) {
       setCurrentRole(role as any);
       setIsAuthenticated(true);
+      navigate('/dashboard');
     } else {
       setSelectedRole(role);
       setPin('');
@@ -36,6 +39,7 @@ export const LoginScreen = () => {
     if (pin === ROLE_PINS[selectedRole!]) {
       setCurrentRole(selectedRole as any);
       setIsAuthenticated(true);
+      navigate('/dashboard');
     } else {
       setError(true);
       setTimeout(() => setError(false), 500);

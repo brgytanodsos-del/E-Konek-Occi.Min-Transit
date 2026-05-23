@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext';
 
 export const SuperAdminDashboard = () => {
   const [activePanel, setActivePanel] = useState<'montenegro' | 'land' | 'passenger'>('montenegro');
-  const { setCurrentRole, setIsAuthenticated } = useApp();
+  const { setCurrentRole, setIsAuthenticated, ferryBookings, vanBookings } = useApp();
 
   const handleLogout = () => {
     setCurrentRole(null);
@@ -32,8 +32,20 @@ export const SuperAdminDashboard = () => {
         </div>
       </header>
 
-      {/* Role Tabs */}
-      <div className="max-w-7xl mx-auto px-6 pt-6">
+      {/* Summary Cards */}
+      <div className="max-w-7xl mx-auto px-6 pt-8">
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border">
+            <p className="text-gray-500 text-sm">Active Bookings</p>
+            <p className="text-3xl font-bold text-[#003087]">{ferryBookings.length + vanBookings.length}</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border">
+            <p className="text-gray-500 text-sm">Total App Users</p>
+            <p className="text-3xl font-bold text-[#00A651]">128</p>
+          </div>
+        </div>
+
+        {/* Role Tabs */}
         <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm w-fit overflow-x-auto max-w-full">
           <TabButton active={activePanel === 'montenegro'} onClick={() => setActivePanel('montenegro')}>
             🚢 Montenegro Shipping

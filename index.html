@@ -1,17 +1,35 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>MindoroTransit PWA</title>
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MindoroTransit</title>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(console.error);
-        });
-      }
+      (function() {
+        // Manifest
+        const manifest = {
+          name: "MindoroTransit",
+          short_name: "MindoroTransit",
+          start_url: ".",
+          display: "standalone",
+          theme_color: "#003580",
+          background_color: "#F0F4F8"
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+        
+        // Service Worker
+        const swCode = `
+          const CACHE_NAME = 'mindorotransit-v1';
+          self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE_NAME)));
+          self.addEventListener('fetch', (e) => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
+        `;
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        const swURL = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swURL).catch(console.error);
+      })();
     </script>
   </head>
   <body>
@@ -19,4 +37,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
