@@ -258,10 +258,10 @@ export const LoginScreen = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/75 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:scale-105 active:scale-95 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 dark:hover:bg-slate-900 cursor-pointer"
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:scale-105 active:scale-95 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer"
                 title="Toggle visual theme"
               >
-                {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-indigo-500" />}
+                {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-indigo-600" />}
               </button>
               <StatusChip tone={isOnline ? 'success' : 'danger'} dot>
                 {isOnline ? 'Live network' : 'Cached mode'}

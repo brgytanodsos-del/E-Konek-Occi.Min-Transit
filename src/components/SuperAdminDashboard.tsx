@@ -119,14 +119,14 @@ export const SuperAdminDashboard = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
                   title="Toggle visual theme"
                 >
                   {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
                 </button>
                 <button
                   onClick={handleLogoutAction}
-                  className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                  className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
                 >
                   Logout 🚢
                 </button>
@@ -146,14 +146,14 @@ export const SuperAdminDashboard = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
                   title="Toggle visual theme"
                 >
                   {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
                 </button>
                 <button
                   onClick={handleLogoutAction}
-                  className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                  className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
                 >
                   Logout 🚐
                 </button>
@@ -173,14 +173,14 @@ export const SuperAdminDashboard = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
                   title="Toggle visual theme"
                 >
                   {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
                 </button>
                 <button
                   onClick={handleLogoutAction}
-                  className="text-xs text-[#003580] font-black hover:text-red-500 transition cursor-pointer"
+                  className="flex h-10 items-center justify-center px-4 text-xs text-[#003580] dark:text-indigo-400 font-black hover:text-red-500 transition-all cursor-pointer hover:bg-white/40 rounded-2xl active:scale-95"
                 >
                   Exit Portal
                 </button>
@@ -207,7 +207,7 @@ export const SuperAdminDashboard = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
                   title="Toggle visual theme"
                 >
                   {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
@@ -215,22 +215,22 @@ export const SuperAdminDashboard = () => {
                 {!showConfirmLogout ? (
                   <button
                     onClick={() => setShowConfirmLogout(true)}
-                    className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                    className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
                   >
                     🔐 Logout
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2 bg-red-50 p-1.5 rounded-xl border border-red-200">
-                    <span className="text-[10px] font-bold text-red-700 font-mono pl-1.5">Are you sure?</span>
+                  <div className="flex items-center h-10 gap-2 bg-red-50 p-1 rounded-2xl border border-red-200 shadow-xs">
+                    <span className="text-[10px] font-black text-red-700 font-mono pl-3 py-1">Are you sure?</span>
                     <button
                       onClick={handleLogoutAction}
-                      className="bg-red-600 text-white font-bold text-[10px] px-2.5 py-1 rounded-lg hover:bg-red-700 cursor-pointer"
+                      className="bg-red-600 text-white font-bold text-[10px] px-3 h-8 rounded-xl hover:bg-red-700 cursor-pointer transition-colors active:scale-95"
                     >
                       Yes
                     </button>
                     <button
                       onClick={() => setShowConfirmLogout(false)}
-                      className="bg-gray-200 text-gray-700 font-bold text-[10px] px-2.5 py-1 rounded-lg hover:bg-gray-300 cursor-pointer"
+                      className="bg-gray-200 text-gray-700 font-bold text-[10px] px-3 h-8 rounded-xl hover:bg-gray-300 cursor-pointer transition-colors active:scale-95"
                     >
                       No
                     </button>
