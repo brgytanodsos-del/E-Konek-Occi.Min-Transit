@@ -93,9 +93,22 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleCancelBooking = (bookingId: string) => {
+  const handleCancelBooking = async (bookingId: string) => {
+    const booking = vanBookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
     setVanBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    updateBookingStatus('vanBookings', bookingId, 'Cancelled').catch(console.error);
+    await updateBookingStatus('vanBookings', bookingId, 'Cancelled');
+
+    // Restore capacity
+    const trip = trips.find(t => t.id === booking.tripId);
+    if (trip && (booking.status === 'Pending' || booking.status === 'Confirmed')) {
+      const seatsToRestore = Number(booking.seats || 1);
+      const updatedTrip = { ...trip, available: Math.min(trip.capacity, trip.available + seatsToRestore) };
+      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+      await persistTrip(updatedTrip);
+    }
+
     setToastMessage("❌ Booking has been cancelled.");
     setTimeout(() => setToastMessage(null), 3000);
     setConfirmingCancelId(null);
@@ -250,7 +263,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                 </table>
               </div>
             </div>
-            {isSuperAdmin || userAccount?.accountType === 'driver' ? (
+            {isSuperAdmin ? (
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
                 <h2 className="text-lg font-black text-[#003087] border-b pb-3">Dispatch Vehicle</h2>
                 <form onSubmit={handleAddTrip} className="space-y-4 mt-4">
@@ -308,8 +321,8 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                     <tr key={b.id} className="hover:bg-slate-50">
                       <td className="py-3">
                         <div className="flex items-center gap-3">
-                          {acc?.selfieUrl && (
-                            <img src={acc.selfieUrl} className="w-8 h-8 rounded-full border object-cover" alt="S" referrerPolicy="no-referrer" />
+                          {(acc?.selfieDataUrl || (acc as any)?.selfieUrl) && (
+                            <img src={acc?.selfieDataUrl || (acc as any)?.selfieUrl} className="w-8 h-8 rounded-full border object-cover" alt="S" referrerPolicy="no-referrer" />
                           )}
                           <div>
                             <div className="font-bold flex items-center gap-1.5">

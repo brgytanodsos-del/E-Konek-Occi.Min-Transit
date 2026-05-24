@@ -27,6 +27,7 @@ export const LoginScreen = () => {
   const navigate = useNavigate();
 
   const handlePassengerLogin = () => {
+    setSessionToken(null);
     setCurrentRole('passenger');
     setIsAuthenticated(true);
     setAuditLog(prev => [{

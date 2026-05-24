@@ -24,7 +24,7 @@ export interface UserAccount {
 }
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
-const ACCOUNT_KEY = 'ekonek_account';
+const ACCOUNT_KEY = 'ekonek_userAccount';
 
 export function loadAccount(): UserAccount | null {
   try {

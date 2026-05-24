@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Panel1 } from '../features/montenegro/Panel1';
-import { Panel2 } from '../features/land/Panel2';
-import { Panel3 } from '../features/passenger/Panel3';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+const Panel1 = lazy(() => import('../features/montenegro/Panel1').then(m => ({ default: m.Panel1 })));
+const Panel2 = lazy(() => import('../features/land/Panel2').then(m => ({ default: m.Panel2 })));
+const Panel3 = lazy(() => import('../features/passenger/Panel3').then(m => ({ default: m.Panel3 })));
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,7 +23,8 @@ export const SuperAdminDashboard = () => {
     setAuditLog,
     formatPST,
     updateTransaction,
-    persistPayout
+    persistPayout,
+    setUserAccount
   } = useApp();
 
   const navigate = useNavigate();
@@ -62,11 +63,20 @@ export const SuperAdminDashboard = () => {
     // Reset session states
     setCurrentRole(null);
     setIsAuthenticated(false);
+    setUserAccount(null);
     navigate('/');
   };
 
   if (!isAuthenticated || !currentRole) {
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-12 h-12 border-4 border-[#FF8800]/20 border-t-[#FF8800] rounded-full animate-spin" />
+        <div>
+          <p className="text-white font-black text-sm uppercase tracking-widest">Verifying Security Session</p>
+          <p className="text-white/40 text-[10px] font-semibold mt-1">Establishing encrypted tunnel to MindoroTransit Hub...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -288,7 +298,18 @@ const AdminReportSectionPanel4 = () => {
     formatPST,
     updateTransaction,
     persistPayout,
-    adminAccounts
+    adminAccounts,
+    ferryBookings,
+    setFerryBookings,
+    vanBookings,
+    setVanBookings,
+    ships,
+    setShips,
+    trips,
+    setTrips,
+    updateBookingStatus,
+    persistShip,
+    persistTrip
   } = useApp();
 
   // Admin Account Generation Drawer
@@ -355,19 +376,11 @@ const AdminReportSectionPanel4 = () => {
   const [filterPeriod, setFilterPeriod] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Audit list folding state
   const [auditOpen, setAuditOpen] = useState(false);
-
-  // Financial statistics calculations
-  const completedTx = transactions.filter(t => t.status === 'Completed');
-
-  const totalCommissions = completedTx.reduce((acc, t) => acc + t.commissionAmount, 0);
-  const totalTransactionsCount = completedTx.length;
-  const ferryCommissions = completedTx.filter(t => t.type === 'Ferry').reduce((acc, t) => acc + t.commissionAmount, 0);
-  const landCommissions = completedTx.filter(t => t.type === 'Van' || t.type === 'Bus').reduce((acc, t) => acc + t.commissionAmount, 0);
-  const totalGrossRevenue = completedTx.reduce((acc, t) => acc + t.grossAmount, 0);
-  const pendingPayout = completedTx.filter(t => !t.paid).reduce((acc, t) => acc + t.commissionAmount, 0);
 
   // Filters calculation
   const getFilteredTransactions = () => {
@@ -385,6 +398,19 @@ const AdminReportSectionPanel4 = () => {
       } else if (filterPeriod === 'Week') {
         const startOfWeek = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
         periodMatches = new Date(t.timestamp).getTime() >= startOfWeek;
+      } else if (filterPeriod === 'Custom') {
+        const txTime = new Date(t.timestamp).getTime();
+        let matchesStart = true;
+        let matchesEnd = true;
+        if (customStartDate) {
+          const start = new Date(customStartDate).setHours(0,0,0,0);
+          matchesStart = txTime >= start;
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate).setHours(23,59,59,999);
+          matchesEnd = txTime <= end;
+        }
+        periodMatches = matchesStart && matchesEnd;
       }
 
       return typeMatches && statusMatches && searchMatches && periodMatches;
@@ -393,11 +419,54 @@ const AdminReportSectionPanel4 = () => {
 
   const filteredList = getFilteredTransactions();
 
+  // Financial statistics calculations
+  const completedTx = filteredList.filter(t => t.status === 'Completed');
+
+  const totalCommissions = completedTx.reduce((acc, t) => acc + t.commissionAmount, 0);
+  const totalTransactionsCount = completedTx.length;
+  const ferryCommissions = completedTx.filter(t => t.type === 'Ferry').reduce((acc, t) => acc + t.commissionAmount, 0);
+  const landCommissions = completedTx.filter(t => t.type === 'Van' || t.type === 'Bus').reduce((acc, t) => acc + t.commissionAmount, 0);
+  const totalGrossRevenue = completedTx.reduce((acc, t) => acc + t.grossAmount, 0);
+  const pendingPayout = completedTx.filter(t => !t.paid).reduce((acc, t) => acc + t.commissionAmount, 0);
+
   // Refund handler
   const handleRefund = async (txId: string) => {
-    if (confirm("Are you sure you want to REFUND this ticket transaction? This action will reverse commissions.")) {
+    if (confirm("Are you sure you want to REFUND this ticket transaction? This action will reverse commissions and cancel the associated booking to free up passenger slots.")) {
+      
+      const tx = transactions.find(t => t.id === txId);
+      if (!tx) return;
+
       setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'Refunded' } : t));
       await updateTransaction(txId, { status: 'Refunded' });
+
+      if (tx.type === 'Ferry') {
+        const booking = ferryBookings.find(b => b.id === tx.bookingId);
+        if (booking && booking.status === 'Confirmed') {
+          setFerryBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Cancelled' } : b));
+          await updateBookingStatus('ferryBookings', booking.id, 'Cancelled');
+          
+          const ship = ships.find(s => s.id === booking.shipId);
+          if (ship) {
+            const updatedShip = { ...ship, available: Math.min(ship.capacity, ship.available + 1) };
+            setShips(prev => prev.map(s => s.id === ship.id ? updatedShip : s));
+            await persistShip(updatedShip);
+          }
+        }
+      } else {
+        const booking = vanBookings.find(b => b.id === tx.bookingId);
+        if (booking && booking.status === 'Confirmed') {
+          setVanBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Cancelled' } : b));
+          await updateBookingStatus('vanBookings', booking.id, 'Cancelled');
+
+          const trip = trips.find(t => t.id === booking.tripId);
+          if (trip) {
+            const seatsToRestore = Number(booking.seats || 1);
+            const updatedTrip = { ...trip, available: Math.min(trip.capacity, trip.available + seatsToRestore) };
+            setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+            await persistTrip(updatedTrip);
+          }
+        }
+      }
     }
   };
 
@@ -793,6 +862,7 @@ const AdminReportSectionPanel4 = () => {
               <option value="All">All History</option>
               <option value="Today">Today Only</option>
               <option value="Week">This Week</option>
+              <option value="Custom">Custom Range</option>
             </select>
           </div>
 
@@ -809,6 +879,29 @@ const AdminReportSectionPanel4 = () => {
             </select>
           </div>
         </div>
+
+        {filterPeriod === 'Custom' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-xs">
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-indigo-700 mb-1.5">Start Date</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full bg-white border border-indigo-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-indigo-700 mb-1.5">End Date</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full bg-white border border-indigo-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-indigo-400"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Table representation */}
         <div className="overflow-x-auto text-sm">

@@ -27,7 +27,11 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     mamburaoWeather,
     isOnline,
     setToastMessage,
-    userAccount
+    userAccount,
+    persistFerryBooking,
+    persistVanBooking,
+    persistShip,
+    persistTrip
   } = useApp();
 
   // Active Screen tracking
@@ -239,6 +243,22 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     const selVoyage = ships.find(s => s.id === voyageId);
     if (!selVoyage) return;
 
+    if (selVoyage.available < 1) {
+      setToastMessage('⚠️ That voyage is already full. Please choose another schedule.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    const isDuplicate = ferryBookings.some(
+      b => b.shipId === voyageId && b.name.toLowerCase() === ferryName.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setToastMessage('⚠️ This passenger is already booked on this voyage.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
     const bookingId = 'fb-' + Math.random().toString(36).substr(2, 9);
     const newBookingObj = {
       id: bookingId,
@@ -252,9 +272,11 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     };
 
     if (isOnline) {
+      const updatedVoyage = { ...selVoyage, available: Math.max(0, selVoyage.available - 1) };
       setFerryBookings(prev => [...prev, newBookingObj]);
-      // Update seats remaining
-      setShips(prev => prev.map(s => s.id === voyageId ? { ...s, available: Math.max(0, s.available - 1) } : s));
+      setShips(prev => prev.map(s => s.id === voyageId ? updatedVoyage : s));
+      persistFerryBooking(newBookingObj).catch(console.error);
+      persistShip(updatedVoyage).catch(console.error);
     } else {
       setOfflineQueue(prev => [...prev, newBookingObj]);
     }
@@ -287,6 +309,24 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     if (!selTrip) return;
 
     const count = Number(seatsCount);
+    const countCheck = Math.max(1, count);
+    
+    if (selTrip.available < countCheck) {
+      setToastMessage(`⚠️ Only ${selTrip.available} seat${selTrip.available === 1 ? '' : 's'} left on this trip.`);
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    const isDuplicate = vanBookings.some(
+      b => b.tripId === tripId && b.name.toLowerCase() === shuttleName.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setToastMessage('⚠️ This passenger is already booked on this trip.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
     const bookingId = 'vb-' + Math.random().toString(36).substr(2, 9);
     const newBookingObj = {
       id: bookingId,
@@ -301,8 +341,11 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     };
 
     if (isOnline) {
+      const updatedTrip = { ...selTrip, available: Math.max(0, selTrip.available - count) };
       setVanBookings(prev => [...prev, newBookingObj]);
-      setTrips(prev => prev.map(t => t.id === tripId ? { ...t, available: Math.max(0, t.available - count) } : t));
+      setTrips(prev => prev.map(t => t.id === tripId ? updatedTrip : t));
+      persistVanBooking(newBookingObj).catch(console.error);
+      persistTrip(updatedTrip).catch(console.error);
     } else {
       setOfflineQueue(prev => [...prev, newBookingObj]);
     }

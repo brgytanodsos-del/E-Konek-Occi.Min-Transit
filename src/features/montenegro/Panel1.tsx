@@ -130,9 +130,21 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleCancelBooking = (bookingId: string) => {
+  const handleCancelBooking = async (bookingId: string) => {
+    const booking = ferryBookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
     setFerryBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    updateBookingStatus('ferryBookings', bookingId, 'Cancelled').catch(console.error);
+    await updateBookingStatus('ferryBookings', bookingId, 'Cancelled');
+
+    // Restore capacity 
+    const ship = ships.find(s => s.id === booking.shipId);
+    if (ship && (booking.status === 'Pending' || booking.status === 'Confirmed')) {
+      const updatedShip = { ...ship, available: Math.min(ship.capacity, ship.available + 1) };
+      setShips(prev => prev.map(s => s.id === ship.id ? updatedShip : s));
+      await persistShip(updatedShip);
+    }
+
     setToastMessage(`❌ Booking has been cancelled.`);
     setTimeout(() => setToastMessage(null), 3505);
     setConfirmingCancelId(null);
@@ -363,9 +375,9 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                         <td className="py-4 font-mono font-black text-xs text-slate-500">#{b.id.toUpperCase()}</td>
                         <td className="py-4">
                           <div className="flex items-center gap-3">
-                            {acc?.selfieUrl && (
+                            {(acc?.selfieDataUrl || (acc as any)?.selfieUrl) && (
                               <img 
-                                src={acc.selfieUrl} 
+                                src={acc?.selfieDataUrl || (acc as any)?.selfieUrl} 
                                 className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-sm ring-2 ring-emerald-500/20" 
                                 alt="Selfie"
                                 referrerPolicy="no-referrer"

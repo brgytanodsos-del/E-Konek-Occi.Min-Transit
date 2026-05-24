@@ -221,6 +221,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const setIsAuthenticated = (auth: boolean) => {
     _setIsAuthenticated(auth);
     if (!auth) {
+      _setSessionToken(null);
       lsClear(LS_KEYS.sessionToken);
       lsClear(LS_KEYS.sessionRole);
     }
@@ -292,17 +293,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
-  // ── Attach Firestore listeners ───────────────────────────────────────────
+  // ── Attach Firestore listeners (Role-Aware) ───────────────────────────
   useEffect(() => {
     let readyCount = 0;
-    const TOTAL = 6;
+    const PUBLIC_TOTAL = 5;
 
     const markReady = () => {
       readyCount++;
-      if (readyCount >= TOTAL) setFirestoreReady(true);
+      if (readyCount >= PUBLIC_TOTAL) setFirestoreReady(true);
     };
 
-    const unsubs = [
+    // 1. PUBLIC/GLOBAL LISTENERS (Everyone)
+    const publicUnsubs = [
       subscribeCollection<any>(COLLECTIONS.ships, (docs) => {
         if (docs.length === 0) seedIfEmpty(COLLECTIONS.ships, SEED_SHIPS);
         else setShips(docs);
@@ -328,26 +330,43 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         else setAnnouncements(docs);
         markReady();
       }),
-      subscribeCollection<any>(COLLECTIONS.transactions, (docs) => {
-        setTransactions(docs);
-        markReady();
-      }, 'createdAt'),
-      subscribeCollection<any>(COLLECTIONS.auditLog, (docs) => {
-        setAuditLog(docs);
-      }, 'createdAt'),
-      subscribeCollection<any>(COLLECTIONS.payoutHistory, (docs) => {
-        setPayoutHistory(docs);
-      }, 'createdAt'),
       subscribeCollection<UserAccount>(COLLECTIONS.userAccounts, (docs) => {
         setUserAccounts(docs);
       }, 'createdAt'),
-      subscribeCollection<any>(COLLECTIONS.adminAccounts, (docs) => {
-        setAdminAccounts(docs);
-      }, 'createdAt'),
     ];
 
-    return () => unsubs.forEach(u => u());
-  }, [seedIfEmpty]);
+    // 2. ADMIN/STAFF LISTENERS (Gated by Role)
+    let adminUnsubs: (() => void)[] = [];
+    const isStaffOrAdmin = ['superadmin', 'port', 'terminal'].includes(currentRole || '');
+
+    if (isAuthenticated && isStaffOrAdmin) {
+      adminUnsubs = [
+        subscribeCollection<any>(COLLECTIONS.transactions, (docs) => {
+          setTransactions(docs);
+        }, 'createdAt'),
+        subscribeCollection<any>(COLLECTIONS.auditLog, (docs) => {
+          setAuditLog(docs);
+        }, 'createdAt'),
+        subscribeCollection<any>(COLLECTIONS.payoutHistory, (docs) => {
+          setPayoutHistory(docs);
+        }, 'createdAt'),
+        subscribeCollection<any>(COLLECTIONS.adminAccounts, (docs) => {
+          setAdminAccounts(docs);
+        }, 'createdAt'),
+      ];
+    } else {
+      // Clear admin state if not admin
+      setTransactions([]);
+      setAuditLog([]);
+      setPayoutHistory([]);
+      setAdminAccounts([]);
+    }
+
+    return () => {
+      publicUnsubs.forEach(u => u());
+      adminUnsubs.forEach(u => u());
+    };
+  }, [seedIfEmpty, isAuthenticated, currentRole]);
 
   const persistShip = useCallback(async (ship: any) => {
     await fsSet(COLLECTIONS.ships, ship.id, ship);
@@ -452,22 +471,105 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!isOnline || offlineQueue.length === 0) return;
 
-    const count = offlineQueue.length;
-    offlineQueue.forEach(item => {
+    const shipAvailability = new Map(ships.map((ship) => [ship.id, ship.available]));
+    const tripAvailability = new Map(trips.map((trip) => [trip.id, trip.available]));
+    const syncedItems: any[] = [];
+    const remainingQueue: any[] = [];
+    const touchedShipIds = new Set<string>();
+    const touchedTripIds = new Set<string>();
+
+    offlineQueue.forEach((item) => {
       const booking = { ...item, status: 'Pending' };
+
       if (item.bookingType === 'ferry') {
-        setFerryBookings(prev => [...prev, booking]);
-        persistFerryBooking(booking).catch(console.error);
+        const available = Number(shipAvailability.get(item.shipId) ?? 0);
+        if (available < 1) {
+          remainingQueue.push({ ...item, syncError: 'No ferry slots available yet.' });
+          return;
+        }
+        shipAvailability.set(item.shipId, available - 1);
+        touchedShipIds.add(item.shipId);
       } else {
-        setVanBookings(prev => [...prev, booking]);
-        persistVanBooking(booking).catch(console.error);
+        const neededSeats = Math.max(1, Number(item.seats || 1));
+        const available = Number(tripAvailability.get(item.tripId) ?? 0);
+        if (available < neededSeats) {
+          remainingQueue.push({ ...item, syncError: 'Not enough land seats available yet.' });
+          return;
+        }
+        tripAvailability.set(item.tripId, available - neededSeats);
+        touchedTripIds.add(item.tripId);
       }
+
+      syncedItems.push(booking);
     });
 
-    setOfflineQueue([]);
-    setToastMessage(`✅ ${count} booking${count !== 1 ? 's' : ''} synced successfully`);
-    setTimeout(() => setToastMessage(null), 3000);
-  }, [isOnline, offlineQueue, persistFerryBooking, persistVanBooking]);
+    if (syncedItems.length > 0) {
+      const ferryItems = syncedItems.filter((item) => item.bookingType === 'ferry');
+      const landItems = syncedItems.filter((item) => item.bookingType === 'land');
+
+      if (ferryItems.length > 0) {
+        setFerryBookings((prev) => {
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...ferryItems.filter((item) => !seen.has(item.id))];
+        });
+        ferryItems.forEach((item) => {
+          persistFerryBooking(item).catch(console.error);
+        });
+      }
+
+      if (landItems.length > 0) {
+        setVanBookings((prev) => {
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...landItems.filter((item) => !seen.has(item.id))];
+        });
+        landItems.forEach((item) => {
+          persistVanBooking(item).catch(console.error);
+        });
+      }
+
+      const updatedShips = ships.map((ship) =>
+        touchedShipIds.has(ship.id)
+          ? { ...ship, available: shipAvailability.get(ship.id) ?? ship.available }
+          : ship
+      );
+      const updatedTrips = trips.map((trip) =>
+        touchedTripIds.has(trip.id)
+          ? { ...trip, available: tripAvailability.get(trip.id) ?? trip.available }
+          : trip
+      );
+
+      if (touchedShipIds.size > 0) {
+        setShips(updatedShips);
+        updatedShips
+          .filter((ship) => touchedShipIds.has(ship.id))
+          .forEach((ship) => persistShip(ship).catch(console.error));
+      }
+
+      if (touchedTripIds.size > 0) {
+        setTrips(updatedTrips);
+        updatedTrips
+          .filter((trip) => touchedTripIds.has(trip.id))
+          .forEach((trip) => persistTrip(trip).catch(console.error));
+      }
+    }
+
+    setOfflineQueue(remainingQueue);
+
+    if (syncedItems.length > 0) {
+      const suffix = remainingQueue.length > 0 ? ` • ${remainingQueue.length} still waiting for available capacity` : '';
+      setToastMessage(`✅ ${syncedItems.length} booking${syncedItems.length !== 1 ? 's' : ''} synced successfully${suffix}`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  }, [
+    isOnline,
+    offlineQueue,
+    ships,
+    trips,
+    persistFerryBooking,
+    persistVanBooking,
+    persistShip,
+    persistTrip,
+  ]);
 
   useEffect(() => {
     const interval = setInterval(() => {
