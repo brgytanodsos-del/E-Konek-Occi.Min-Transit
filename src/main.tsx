@@ -9,6 +9,10 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { Toaster } from 'sonner';
 import './index.css';
 
+import { validateEnvironment } from './lib/env';
+
+validateEnvironment();
+
 const App = () => {
   return (
     <BrowserRouter>
