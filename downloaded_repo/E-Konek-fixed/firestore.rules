@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Role is stored in a custom claim set by the server after PIN verification.
+    // If you use anonymous auth + custom claims, check request.auth.token.role.
+    // For now we keep the same pattern: signed-in users can write.
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.get('role', '') == role;
+    }
+
+    function isStaff() {
+      return hasRole('port') || hasRole('terminal') || hasRole('superadmin');
+    }
+
+    // ── Vessels (ships) ──────────────────────────────────────────────────────
+    match /vessels/{id} {
+      allow read: if true;                    // passengers can read schedules
+      allow write: if isStaff();
+    }
+
+    // ── Trips (land dispatch) ─────────────────────────────────────────────────
+    match /trips/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // ── Ferry Bookings ────────────────────────────────────────────────────────
+    match /ferryBookings/{id} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isStaff();
+      allow delete: if hasRole('superadmin');
+    }
+
+    // ── Van / Bus Bookings ────────────────────────────────────────────────────
+    match /vanBookings/{id} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isStaff();
+      allow delete: if hasRole('superadmin');
+    }
+
+    // ── Announcements ─────────────────────────────────────────────────────────
+    match /announcements/{id} {
+      allow read:  if true;
+      allow write: if isStaff();
+    }
+
+    // ── Transactions (commission ledger) ──────────────────────────────────────
+    match /transactions/{id} {
+      allow read:   if isStaff();
+      allow create: if isStaff();
+      allow update: if hasRole('superadmin');   // refunds / mark paid
+      allow delete: if false;                   // never delete financial records
+    }
+
+    // ── Payout History ────────────────────────────────────────────────────────
+    match /payoutHistory/{id} {
+      allow read:   if hasRole('superadmin');
+      allow create: if hasRole('superadmin');
+      allow update, delete: if false;
+    }
+
+    // ── Audit Log ─────────────────────────────────────────────────────────────
+    match /auditLog/{id} {
+      allow read:   if hasRole('superadmin');
+      allow create: if isSignedIn();             // any login/logout can append
+      allow update, delete: if false;            // immutable
+    }
+  }
+}

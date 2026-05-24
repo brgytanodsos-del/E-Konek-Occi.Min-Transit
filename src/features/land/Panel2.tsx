@@ -196,7 +196,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
   }, [activeTab, trips, gpsIndices]);
 
   return (
-    <div className="p-6 space-y-8 animate-fade-in text-slate-800">
+    <div className="panel-page p-6 space-y-8 animate-fade-in text-slate-800">
       <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-150 shadow-sm">
         <div className="p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
           <div className="space-y-2">
@@ -315,7 +315,19 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
             <table className="w-full text-left">
               <thead><tr className="border-b text-[9px] uppercase font-black text-slate-400"><th>Passenger</th><th>Status</th><th>Seats</th><th className="text-right">Action</th></tr></thead>
               <tbody className="divide-y">
-                {filteredBookings.map(b => {
+                {filteredBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-12">
+                      <div className="flex flex-col items-center justify-center text-center space-y-3 opacity-60">
+                        <i className="fa-solid fa-clipboard-list text-4xl text-slate-300"></i>
+                        <div>
+                          <p className="text-slate-500 font-bold">No bookings found</p>
+                          <p className="text-xs text-slate-400">Terminal bookings will appear here.</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredBookings.map(b => {
                   const acc = userAccounts.find(a => a.id === (b as any).accountId);
                   return (
                     <tr key={b.id} className="hover:bg-slate-50">

@@ -382,7 +382,7 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
     const tripObj = trips.find(t => t.id === trackedTripId);
 
     return (
-      <div className="min-h-[calc(100vh-80px)] bg-slate-50/70 backdrop-blur-[2px] flex flex-col animate-fade-in relative text-slate-850">
+      <div className="panel-page min-h-[calc(100vh-80px)] bg-slate-50/70 backdrop-blur-[2px] flex flex-col animate-fade-in relative text-slate-850">
         {/* Navigation bar */}
         <div className="bg-[#003087] text-white p-4 flex items-center justify-between shadow-md border-b-2 border-[#FF8800]">
           <div className="flex items-center gap-3">
@@ -454,7 +454,7 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   }
 
   return (
-    <div className="p-6 space-y-8 animate-fade-in text-slate-800">
+    <div className="panel-page p-6 space-y-8 animate-fade-in text-slate-800">
       
       {/* Wind Warning Banner */}
       {isWindAdvisory && (
@@ -693,7 +693,13 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
               <span className="text-[10px] font-black uppercase text-[#009E49] px-2 py-0.5 bg-[#009E49]/15 rounded-full">Abra Pier Dock</span>
             </div>
             <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
-              {ships.map((s) => (
+              {ships.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
+                  <i className="fa-solid fa-ship text-3xl text-slate-300 mb-2"></i>
+                  <p className="text-slate-500 font-bold text-sm">No scheduled sailings</p>
+                  <p className="text-[10px] text-slate-400">Please check back later.</p>
+                </div>
+              ) : ships.map((s) => (
                 <div key={s.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
                   <div className="space-y-1">
                     <span className="font-black text-slate-800 text-sm block">{s.name}</span>
@@ -732,7 +738,13 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
               <span className="text-[10px] font-black uppercase text-amber-600 px-2 py-0.5 bg-amber-100/80 rounded-full">Shuttle / Bus</span>
             </div>
             <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
-              {trips.map((t) => (
+              {trips.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
+                  <i className="fa-solid fa-bus text-3xl text-slate-300 mb-2"></i>
+                  <p className="text-slate-500 font-bold text-sm">No active dispatch schedules</p>
+                  <p className="text-[10px] text-slate-400">Please check back later.</p>
+                </div>
+              ) : trips.map((t) => (
                 <div key={t.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
                   <div className="space-y-1">
                     <span className="font-black text-slate-800 text-sm block">{t.driver}</span>

@@ -1,0 +1,6 @@
+{
+  "name": "E-Konek Occi.Mindo Transit",
+  "description": "Transit management system for Montenegro Shipping Line and Mamburao Grand Terminal",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

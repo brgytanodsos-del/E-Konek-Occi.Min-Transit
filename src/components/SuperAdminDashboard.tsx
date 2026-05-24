@@ -80,7 +80,7 @@ export const SuperAdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F0F4F8] flex flex-col relative pb-[64px] sm:pb-0">
+    <div className="dashboard-shell min-h-screen bg-transparent flex flex-col relative pb-[76px] sm:pb-0">
       
       {/* Subtle Mamburao, Occidental Mindoro Flag Background Watermark */}
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.07] select-none">
@@ -94,7 +94,7 @@ export const SuperAdminDashboard = () => {
       
       {/* 1. PERSISTENT TOP STATUS BAR (28px) */}
       <div
-        className={`fixed top-0 left-0 right-0 h-[28px] z-[100] text-white text-xs font-bold leading-[28px] text-center transition-colors duration-500 shadow-sm ${
+        className={`dashboard-statusbar fixed top-0 left-0 right-0 h-[32px] z-[100] text-white text-xs font-semibold leading-[32px] text-center transition-colors duration-500 shadow-sm ${
           isOnline ? 'bg-emerald-600' : 'bg-red-600 animate-pulse'
         }`}
       >
@@ -107,7 +107,7 @@ export const SuperAdminDashboard = () => {
         {/* VIEW SCHEME: PORT STAFF */}
         {currentRole === 'port' && (
           <div className="flex-1 flex flex-col">
-            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-xs">
+            <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-xs">
               <span className="font-extrabold text-[#003580] tracking-tight text-sm">Abra Port Station</span>
               <button
                 onClick={handleLogoutAction}
@@ -125,7 +125,7 @@ export const SuperAdminDashboard = () => {
         {/* VIEW SCHEME: TERMINAL STAFF */}
         {currentRole === 'terminal' && (
           <div className="flex-1 flex flex-col">
-            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-xs">
+            <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-xs">
               <span className="font-extrabold text-[#003580] tracking-tight text-sm">Mamburao dispatch Panel</span>
               <button
                 onClick={handleLogoutAction}
@@ -143,7 +143,7 @@ export const SuperAdminDashboard = () => {
         {/* VIEW SCHEME: PASSENGER PORTAL */}
         {currentRole === 'passenger' && (
           <div className="flex-1 flex flex-col">
-            <header className="bg-transparent py-3 px-6 flex justify-between items-center z-10">
+            <header className="dashboard-header rounded-b-[24px] bg-white/65 py-4 px-6 flex justify-between items-center z-10">
               <span className="text-[10px] uppercase font-black tracking-widest text-[#003580]/50 font-sans">Public Station Access</span>
               <button
                 onClick={handleLogoutAction}
@@ -163,7 +163,7 @@ export const SuperAdminDashboard = () => {
           <div className="flex-1 flex flex-col">
             
             {/* Topbar for Admin */}
-            <header className="bg-white border-b border-gray-100 py-3.5 px-6 flex justify-between items-center shadow-sm">
+            <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="bg-[#FF6B00] text-white font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded">ADMIN MODE</span>
                 <span className="font-bold text-sm text-gray-500 font-sans">E-Transit Hub</span>
@@ -218,54 +218,29 @@ export const SuperAdminDashboard = () => {
             </div>
 
             {/* FIXED BOTTOM NAV BAR (z-index 50) */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-[64px] z-50 flex justify-around items-center px-4 shadow-lg">
-              <button
-                onClick={() => setAdminActiveTab(0)}
-                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
-                  adminActiveTab === 0
-                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
-                    : 'text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                <i className={`fa-solid fa-ship text-lg ${adminActiveTab === 0 ? 'text-[#003087]' : 'text-gray-400'}`}></i>
-                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Port</span>
-              </button>
-
-              <button
-                onClick={() => setAdminActiveTab(1)}
-                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
-                  adminActiveTab === 1
-                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
-                    : 'text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                <i className={`fa-solid fa-bus text-lg ${adminActiveTab === 1 ? 'text-[#FF8800]' : 'text-gray-400'}`}></i>
-                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Hub</span>
-              </button>
-
-              <button
-                onClick={() => setAdminActiveTab(2)}
-                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
-                  adminActiveTab === 2
-                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
-                    : 'text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                <i className={`fa-solid fa-user-check text-lg ${adminActiveTab === 2 ? 'text-emerald-500' : 'text-gray-400'}`}></i>
-                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Booking</span>
-              </button>
-
-              <button
-                onClick={() => setAdminActiveTab(3)}
-                className={`flex-1 flex flex-col items-center justify-center h-full cursor-pointer transition ${
-                  adminActiveTab === 3
-                    ? 'border-t-2 border-[#FF6B00] text-[#FF6B00]'
-                    : 'text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                <i className={`fa-solid fa-shield-halved text-lg ${adminActiveTab === 3 ? 'text-indigo-600' : 'text-gray-400'}`}></i>
-                <span className="text-[9px] font-black uppercase tracking-widest font-sans mt-1">Admin</span>
-              </button>
+            <nav className="dashboard-nav fixed bottom-0 sm:bottom-6 left-0 sm:left-1/2 right-0 sm:right-auto sm:-translate-x-1/2 bg-white/90 backdrop-blur-xl border border-slate-200/50 sm:rounded-[24px] rounded-t-[24px] h-[76px] z-50 flex justify-around items-center px-6 shadow-2xl sm:min-w-[420px] transition-all overflow-hidden flex-nowrap">
+              {[
+                { id: 0, label: 'Port', icon: 'fa-ship', color: 'text-blue-600', activeBg: 'bg-blue-50' },
+                { id: 1, label: 'Hub', icon: 'fa-bus', color: 'text-orange-500', activeBg: 'bg-orange-50' },
+                { id: 2, label: 'Booking', icon: 'fa-user-check', color: 'text-emerald-500', activeBg: 'bg-emerald-50' },
+                { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-indigo-600', activeBg: 'bg-indigo-50' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setAdminActiveTab(tab.id)}
+                  className={`relative flex-1 flex flex-col items-center justify-center h-full px-2 cursor-pointer transition-all duration-300 ease-out group ${
+                    adminActiveTab === tab.id ? 'text-slate-900 scale-105' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <div className={`flex flex-col items-center justify-center p-2 rounded-xl transition-colors ${adminActiveTab === tab.id ? tab.activeBg : 'bg-transparent group-hover:bg-slate-50'}`}>
+                    <i className={`fa-solid ${tab.icon} text-lg mb-1 transition-transform ${adminActiveTab === tab.id ? `${tab.color} drop-shadow-sm` : ''}`}></i>
+                    <span className={`text-[9px] font-black uppercase tracking-widest font-sans transition-all ${adminActiveTab === tab.id ? tab.color : ''}`}>{tab.label}</span>
+                  </div>
+                  {adminActiveTab === tab.id && (
+                    <motion.div layoutId="nav-indicator" className={`absolute -bottom-1 w-8 h-1.5 rounded-full ${tab.color.replace('text-', 'bg-')} shadow-sm`} />
+                  )}
+                </button>
+              ))}
             </nav>
 
           </div>
@@ -275,7 +250,7 @@ export const SuperAdminDashboard = () => {
 
       {/* TOAST PANEL (appears bottom-center, slides up) */}
       {toastMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#00A651] text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-2xl z-[9999] flex items-center justify-center gap-2.5 border border-green-500 animate-slide-up">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 rounded-[20px] border border-emerald-300 bg-white/92 px-6 py-3.5 text-emerald-700 shadow-[0_18px_36px_rgba(15,139,102,0.22)] z-[9999] flex items-center justify-center gap-2.5 animate-slide-up backdrop-blur-md">
           <span className="text-sm">🔔</span>
           <span className="text-xs uppercase tracking-wider">{toastMessage}</span>
         </div>
@@ -539,7 +514,7 @@ const AdminReportSectionPanel4 = () => {
   const busPct = Math.round((busCommissions / totalCommGraph) * 100);
 
   return (
-    <div className="p-6 space-y-8 animate-fade-in text-[#2D3748]">
+    <div className="admin-report-page p-6 space-y-8 animate-fade-in text-[#2D3748]">
       
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <h1 className="text-2xl font-black text-[#003580] tracking-tight font-sans">🛡️ Super Admin Control and Financial Console</h1>
@@ -921,41 +896,53 @@ const AdminReportSectionPanel4 = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredList.map((t) => (
+              {filteredList.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-16">
+                    <div className="flex flex-col items-center justify-center text-center space-y-3 opacity-60">
+                      <i className="fa-solid fa-file-invoice text-4xl text-slate-300"></i>
+                      <div>
+                        <p className="text-slate-500 font-bold">No transactions found</p>
+                        <p className="text-xs text-slate-400">Try adjusting your filters or date range.</p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredList.map((t) => (
                 <tr
                   key={t.id}
-                  className={`hover:bg-gray-50/50 ${
-                    t.status === 'Completed' ? 'bg-green-50/15' : 'bg-red-50/30'
+                  className={`hover:bg-gray-50 transition-colors ${
+                    t.status === 'Completed' ? 'bg-green-50/10' : 'bg-rose-50/20'
                   }`}
                 >
-                  <td className="py-3.5 font-mono text-[10px] font-semibold text-gray-500">{formatPST(t.timestamp)}</td>
-                  <td className="py-3.5 font-mono text-[10px] font-bold text-blue-900">#{t.id.toUpperCase()}</td>
-                  <td className="py-3.5 font-semibold text-gray-800 text-xs">{t.passengerName}</td>
-                  <td className="py-3.5 text-gray-500 text-xs font-medium">
-                    <div>{t.route}</div>
-                    <span className="text-[9px] font-bold text-indigo-400 font-mono uppercase bg-indigo-50 px-1 py-0.2 rounded mt-1.5 inline-block">{t.type}</span>
+                  <td className="py-4 px-2 font-mono text-[9px] font-semibold text-slate-500">{formatPST(t.timestamp)}</td>
+                  <td className="py-4 font-mono text-[10px] font-black text-indigo-600">#{t.id.toUpperCase()}</td>
+                  <td className="py-4 font-bold text-slate-800 text-xs">{t.passengerName}</td>
+                  <td className="py-4 text-slate-500 text-[10px] font-semibold leading-tight">
+                    <p className="mb-1 text-slate-700">{t.route}</p>
+                    <span className="font-extrabold text-blue-500 font-mono uppercase bg-blue-50 px-1.5 py-0.5 rounded tracking-wider">{t.type}</span>
                   </td>
-                  <td className="py-3.5 text-xs text-slate-800 italic">{t.ticketType}</td>
-                  <td className="py-3.5 font-bold text-gray-700 text-xs">₱{t.grossAmount}</td>
-                  <td className="py-3.5 font-bold text-orange-600 text-xs">₱{t.commissionAmount}</td>
-                  <td className="py-3.5 text-gray-500 text-xs font-semibold">{t.confirmedBy}</td>
-                  <td className="py-3.5 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-red-155 text-red-600 bg-red-50 border border-red-200'
+                  <td className="py-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest">{t.ticketType}</td>
+                  <td className="py-4 font-black text-slate-700 text-sm">₱{t.grossAmount}</td>
+                  <td className="py-4 font-black text-orange-600 text-sm">₱{t.commissionAmount}</td>
+                  <td className="py-4 text-slate-400 text-[10px] font-bold uppercase">{t.confirmedBy}</td>
+                  <td className="py-4 text-center">
+                    <span className={`px-2 py-1 rounded-md text-[9px] uppercase tracking-widest font-black ${
+                      t.status === 'Completed' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'
                     }`}>
                       {t.status}
                     </span>
                   </td>
-                  <td className="py-3.5 text-right no-print">
+                  <td className="py-4 text-right pr-2 no-print">
                     {t.status === 'Completed' ? (
                       <button
                         onClick={() => handleRefund(t.id)}
-                        className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[10px] px-2.5 py-1 rounded-lg transition"
+                        className="bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 font-black text-[10px] px-3 py-1.5 rounded-lg transition"
                       >
                         Refund
                       </button>
                     ) : (
-                      <span className="text-red-500 text-xs font-extrabold italic font-serif">Refunded</span>
+                      <span className="text-rose-500/50 text-[10px] font-black uppercase tracking-widest block pr-2">Refunded</span>
                     )}
                   </td>
                 </tr>

@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Static data (ships, trips, announcements)
+    match /vessels/{vesselId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /trips/{tripId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Dynamic data (bookings)
+    match /ferryBookings/{bookingId} {
+      allow read, create: if true;
+      allow update: if true;
+    }
+
+    match /vanBookings/{bookingId} {
+      allow read, create: if true;
+      allow update: if true;
+    }
+
+    // Administrative data
+    match /adminAccounts/{accountId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /userAccounts/{accountId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /transactions/{txId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /payoutHistory/{pId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /auditLog/{logId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

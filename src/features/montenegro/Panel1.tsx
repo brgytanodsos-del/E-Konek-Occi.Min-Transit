@@ -162,7 +162,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
   const isHighWind = abraWeather && abraWeather.windspeed_10m > 30;
 
   return (
-    <div className="p-6 space-y-8 animate-fade-in text-slate-800">
+    <div className="panel-page p-6 space-y-8 animate-fade-in text-slate-800">
       {isHighWind && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="bg-red-600 text-white px-6 py-4 rounded-3xl shadow-lg border-2 border-red-500 animate-pulse flex items-center justify-between gap-4">
@@ -366,7 +366,19 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-                  {filteredBookings.map((b) => {
+                  {filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12">
+                        <div className="flex flex-col items-center justify-center text-center space-y-3 opacity-60">
+                          <i className="fa-solid fa-ticket-simple text-4xl text-slate-300"></i>
+                          <div>
+                            <p className="text-slate-500 font-bold">No reservations found</p>
+                            <p className="text-xs text-slate-400">Bookings will appear here once submitted.</p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredBookings.map((b) => {
                     const s = ships.find(shp => shp.id === b.shipId);
                     const acc = userAccounts.find(a => a.id === (b as any).accountId);
                     
@@ -445,22 +457,100 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
         </div>
       )}
 
+      {/* BRANDED PREMIUM PRINT TICKET MODAL */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm no-print">
-          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-[#009E49] text-white p-5 text-center font-black uppercase text-sm">Boarding Pass</div>
-            <div id="print-ticket" className="p-6 bg-white space-y-4">
-              <div className="flex justify-between border-b border-dashed pb-2">
-                <div><label className="text-[9px] uppercase font-black text-slate-400">Passenger</label><p className="font-black text-slate-800">{selectedTicket.name}</p></div>
-                <div className="text-right"><label className="text-[9px] uppercase font-black text-slate-400">Class</label><p className="font-bold text-[#009E49]">{selectedTicket.type}</p></div>
+        <div className="fixed inset-0 z-[999] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md no-print">
+          <div className="max-w-md w-full relative">
+            
+            {/* The Ticket Itself */}
+            <div id="print-ticket" className="bg-white rounded-3xl shadow-2xl overflow-hidden relative border border-slate-200">
+              {/* Premium Header */}
+              <div className="bg-[#002150] text-white p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10 blur-[2px]">
+                  <i className="fa-solid fa-anchor text-6xl"></i>
+                </div>
+                <div className="relative z-10 flex justify-between items-start">
+                  <div>
+                    <h3 className="text-xl font-black tracking-tight text-white m-0 leading-none">MONTENEGRO</h3>
+                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-400 mt-1">Shipping Lines, Inc.</p>
+                  </div>
+                  <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/20">
+                    <p className="text-[9px] uppercase font-black tracking-widest leading-none text-white/70">Terminal</p>
+                    <p className="text-sm font-black font-mono leading-none mt-1">ABRA</p>
+                  </div>
+                </div>
               </div>
-              <div><label className="text-[9px] uppercase font-black text-slate-400">Voyage</label><p className="text-xs font-black">{selectedTicket.route}</p></div>
-              <div className="flex justify-center p-4 bg-slate-50 rounded-2xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${selectedTicket.id}`} className="w-32 h-32" referrerPolicy="no-referrer" /></div>
-              <p className="text-center font-mono text-[10px] font-black text-slate-400">#{selectedTicket.id.toUpperCase()}</p>
+
+              {/* Decorative Perforation */}
+              <div className="relative h-6 bg-[#002150]">
+                <div className="absolute inset-x-0 h-full bg-white rounded-t-3xl" style={{ borderTop: '2px dashed #CBD5E1' }}></div>
+                {/* Side semi-circles */}
+                <div className="absolute -left-3 top-[-10px] w-6 h-6 bg-slate-900/80 sm:bg-slate-900/60 rounded-full no-print"></div>
+                <div className="absolute -right-3 top-[-10px] w-6 h-6 bg-slate-900/80 sm:bg-slate-900/60 rounded-full no-print"></div>
+              </div>
+
+              {/* Passenger & Trip Details */}
+              <div className="px-8 pb-8 pt-4 space-y-6 relative bg-white">
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[9px] uppercase font-black text-slate-400 mb-1 tracking-widest">Passenger Name</label>
+                    <p className="font-black text-slate-800 text-lg uppercase leading-tight truncate">{selectedTicket.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <label className="block text-[9px] uppercase font-black text-slate-400 mb-1 tracking-widest">Fare Class</label>
+                    <p className="font-black text-[#FF6B00] text-lg uppercase leading-tight">{selectedTicket.type}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl relative overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#00A651]"></div>
+                  <label className="block text-[9px] uppercase font-black text-slate-400 mb-1 tracking-widest">Voyage Route</label>
+                  <p className="text-sm font-black text-[#002150]">{selectedTicket.route}</p>
+                  {selectedTicket.depTime && (
+                    <div className="mt-2 flex items-center gap-2 text-xs font-bold text-slate-600">
+                      <i className="fa-regular fa-clock text-slate-400"></i>
+                      {formatPST(selectedTicket.depTime)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Barcode & Ref Sector */}
+                <div className="flex flex-col items-center justify-center pt-2">
+                  <div className="p-2 bg-white rounded-xl">
+                    {/* Fallback styling looking like a barcode, alongside the QR */}
+                    <div className="flex items-center gap-6 justify-center">
+                       <div className="flex gap-[2px] h-16 w-24 opacity-80 mix-blend-multiply greyscale">
+                          {/* Pseudo barcode lines */}
+                          {[1,3,2,1,4,1,2,5,1,2,3,1,1,2].map((w,i) => (
+                            <div key={i} className="bg-slate-800 h-full" style={{ width: `${w * 2}px` }}></div>
+                          ))}
+                       </div>
+                       <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${selectedTicket.id}`} className="w-16 h-16 object-contain" referrerPolicy="no-referrer" alt="QR" />
+                    </div>
+                  </div>
+                  <p className="text-center font-mono text-[11px] font-bold tracking-[0.25em] text-slate-500 mt-2">
+                    REF: {selectedTicket.id.toUpperCase()}
+                  </p>
+                </div>
+
+              </div>
             </div>
-            <div className="p-4 bg-slate-50 border-t flex gap-2 no-print">
-              <button onClick={() => window.print()} className="flex-1 bg-[#009E49] text-white text-xs font-black py-3 rounded-xl">Print</button>
-              <button onClick={() => setSelectedTicket(null)} className="px-4 text-xs font-bold text-slate-500">Close</button>
+
+            {/* Actions Panel below ticket */}
+            <div className="mt-4 flex gap-3 no-print">
+              <button 
+                onClick={() => window.print()} 
+                className="flex-1 bg-white hover:bg-slate-50 text-[#002150] text-sm font-black py-4 rounded-2xl shadow-lg flex justify-center items-center gap-2 border border-slate-100 transition-transform active:scale-95"
+              >
+                <i className="fa-solid fa-print"></i> Print Pass
+              </button>
+              <button 
+                onClick={() => setSelectedTicket(null)} 
+                className="flex-1 bg-slate-800 hover:bg-slate-900 text-white text-sm font-black py-4 rounded-2xl shadow-lg border border-slate-700 transition-transform active:scale-95"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
