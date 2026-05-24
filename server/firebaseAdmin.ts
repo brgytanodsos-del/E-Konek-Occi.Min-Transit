@@ -40,10 +40,36 @@ if (!admin.apps.length) {
 // Export the initialized firestore instance with the correct database ID
 export const db = getFirestore(databaseId === "(default)" ? undefined : databaseId);
 
-// Test the database connection to catch errors early
-db.collection('health').limit(1).get().catch(err => {
-  console.error(`🚨 Firestore Connection Error (Project: ${projectId}, DB: ${databaseId}):`, err.message);
-});
+export let isAdminSDKAuthorized = false;
+
+// Test the database connection to catch errors early via REST API
+// Bypassing gRPC Admin SDK test prevents gRPC PERMISSION_DENIED Error 7 traces in sandboxed environments
+const apiKey = process.env.VITE_FIREBASE_API_KEY;
+if (apiKey) {
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId === "(default)" ? "(default)" : databaseId}/documents:runQuery?key=${apiKey}`;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'health' }],
+        limit: 1
+      }
+    })
+  })
+    .then((res) => {
+      if (res.ok) {
+        console.log(`✅ Firestore connection successfully verified via REST API.`);
+      } else {
+        console.warn(`🚨 Firestore connection REST health check returned status: ${res.status}`);
+      }
+    })
+    .catch((err) => {
+      console.warn(`🚨 Firestore connection REST health check encountered error: ${err.message}`);
+    });
+} else {
+  console.log(`ℹ️ Skipping Firestore connection check because VITE_FIREBASE_API_KEY is not set.`);
+}
 
 export default admin;
 

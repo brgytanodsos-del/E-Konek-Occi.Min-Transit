@@ -5,6 +5,8 @@ const Panel3 = lazy(() => import('../features/passenger/Panel3').then(m => ({ de
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { Mic } from 'lucide-react';
+import { VoiceAssistantPanel } from './VoiceAssistantPanel';
 
 export const SuperAdminDashboard = () => {
   const {
@@ -34,6 +36,9 @@ export const SuperAdminDashboard = () => {
 
   // In-line Super Admin logouts confirmations
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+
+  // Super Admin voice assistant modal
+  const [isVoicePanelOpen, setIsVoicePanelOpen] = useState(false);
 
   // Redirect if unauthorized
   useEffect(() => {
@@ -247,6 +252,22 @@ export const SuperAdminDashboard = () => {
         )}
 
       </div>
+
+      {/* Voice Assistant Trigger FAB (Super Admin Exclusive) */}
+      {currentRole === 'superadmin' && (
+        <button
+          onClick={() => setIsVoicePanelOpen(true)}
+          type="button"
+          className="fixed bottom-[96px] right-4 sm:bottom-6 sm:right-1/2 sm:-mr-[256px] bg-gradient-to-br from-[#FF6B00] to-red-500 text-white w-14 h-14 rounded-full shadow-2xl active:scale-95 transition-all flex items-center justify-center border-4 border-white dark:border-slate-800 z-50 cursor-pointer hover:scale-105"
+          title="Super Admin Voice Assistant"
+          id="superadmin-voice-fab"
+        >
+          <Mic className="w-6 h-6 animate-pulse" />
+        </button>
+      )}
+
+      {/* Voice Assistant Overlay Panel */}
+      <VoiceAssistantPanel isOpen={isVoicePanelOpen} onClose={() => setIsVoicePanelOpen(false)} />
 
       {/* TOAST PANEL (appears bottom-center, slides up) */}
       {toastMessage && (

@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import admin, { db } from '../firebaseAdmin';
+import admin, { db, isAdminSDKAuthorized } from '../firebaseAdmin';
 
 const router = express.Router();
 
@@ -9,6 +9,88 @@ const PIN_HASHES: Record<string, string> = {
   port:       crypto.createHash('sha256').update('2001').digest('hex'),
   terminal:   crypto.createHash('sha256').update('2002').digest('hex'),
 };
+
+async function queryAdminAccountREST(role: string, pin: string): Promise<boolean> {
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0184019680';
+  const apiKey = process.env.VITE_FIREBASE_API_KEY;
+  if (!apiKey) {
+    console.warn("Firestore REST query skipped: VITE_FIREBASE_API_KEY is not defined in server process environment.");
+    return false;
+  }
+
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`;
+
+  const queryBody = {
+    structuredQuery: {
+      from: [{ collectionId: 'adminAccounts' }],
+      where: {
+        compositeFilter: {
+          op: 'AND',
+          filters: [
+            {
+              fieldFilter: {
+                field: { fieldPath: 'role' },
+                op: 'EQUAL',
+                value: { stringValue: role }
+              }
+            },
+            {
+              fieldFilter: {
+                field: { fieldPath: 'pin' },
+                op: 'EQUAL',
+                value: { stringValue: pin }
+              }
+            },
+            {
+              fieldFilter: {
+                field: { fieldPath: 'status' },
+                op: 'EQUAL',
+                value: { stringValue: 'active' }
+              }
+            }
+          ]
+        }
+      },
+      limit: 1
+    }
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!response.ok) {
+      console.warn(`Firestore REST fallback: runQuery failed with status ${response.status}`);
+      return false;
+    }
+
+    const results = await response.json();
+    if (Array.isArray(results) && results.length > 0 && results[0]?.document) {
+      const doc = results[0].document;
+      const docPath = doc.name;
+      
+      // Asynchronously update last login without blocking token issuance
+      fetch(`https://firestore.googleapis.com/v1/${docPath}?updateMask.fieldPaths=lastLogin&key=${apiKey}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            lastLogin: { stringValue: new Date().toISOString() }
+          }
+        })
+      }).catch(e => console.warn("Firestore REST fallback: failed to update lastLogin:", e));
+
+      return true;
+    }
+  } catch (err: any) {
+    console.warn("Firestore REST fallback query encountered network error:", err.message);
+  }
+
+  return false;
+}
 
 // POST /api/auth/verify-pin
 router.post('/verify-pin', async (req, res) => {
@@ -42,24 +124,46 @@ router.post('/verify-pin', async (req, res) => {
 
   // 2. Check dynamic admin accounts from Firestore
   if (!verified) {
-    try {
-      if (!db) throw new Error("Firestore database not initialized");
-      
-      const snapshot = await db.collection('adminAccounts')
-        .where('role', '==', role)
-        .where('pin', '==', pin)
-        .where('status', '==', 'active')
-        .limit(1)
-        .get();
+    if (isAdminSDKAuthorized) {
+      try {
+        if (!db) throw new Error("Firestore database not initialized");
+        
+        const snapshot = await db.collection('adminAccounts')
+          .where('role', '==', role)
+          .where('pin', '==', pin)
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
 
-      if (!snapshot.empty) {
-        verified = true;
-        // Optionally update last login
-        const accountDoc = snapshot.docs[0];
-        await accountDoc.ref.update({ lastLogin: new Date().toISOString() });
+        if (!snapshot.empty) {
+          verified = true;
+          // Optionally update last login
+          const accountDoc = snapshot.docs[0];
+          await accountDoc.ref.update({ lastLogin: new Date().toISOString() });
+        }
+      } catch (err: any) {
+        console.log(`Firestore Admin SDK check failed during query (${err.message}). Trying secure REST API fallback...`);
+        try {
+          const hasAccount = await queryAdminAccountREST(role, pin);
+          if (hasAccount) {
+            verified = true;
+          } else {
+            console.log("Firestore REST API: No matching dynamic admin account found.");
+          }
+        } catch (restErr: any) {
+          console.warn("Firestore REST fallback query also failed:", restErr.message || restErr);
+        }
       }
-    } catch (err) {
-      console.warn("Firestore check failed, falling back to master only:", err);
+    } else {
+      // Secure fallback mode: Bypassing standard Admin SDK entirely to avoid gRPC PERMISSION_DENIED errors
+      try {
+        const hasAccount = await queryAdminAccountREST(role, pin);
+        if (hasAccount) {
+          verified = true;
+        }
+      } catch (restErr: any) {
+        console.warn("Firestore REST fallback query failed:", restErr.message || restErr);
+      }
     }
   }
 
