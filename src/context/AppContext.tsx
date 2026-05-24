@@ -227,6 +227,8 @@ interface AppContextType {
   updateShipStatus: (id: string, status: string) => Promise<void>;
   updateTripStatus: (id: string, status: string) => Promise<void>;
   updateBookingStatus: (id: string, type: 'ferry' | 'van', status: string) => Promise<void>;
+  isDarkMode: boolean;
+  setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -238,6 +240,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [userAccount, setUserAccount] = useState<UserAccount | null>(null);
+
+  // Dark Mode Setting with robust local cache & media preference detection
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    }
+  }, [isDarkMode]);
 
   // Network State
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -605,7 +629,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (isOnline) {
         await setDoc(doc(db, 'announcements', ann.id), ann);
       }
-      setAnnouncements(prev => [ann, ...prev]);
+      setAnnouncements(prev => {
+        if (prev.some(a => a.id === ann.id)) return prev;
+        return [ann, ...prev];
+      });
     } catch (e) {
       console.warn("persistAnnouncement Fallback:", e);
     }
@@ -615,14 +642,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       const qItem = { ...booking, status: 'Queued' as const, queueType: 'ferryBooking' };
       setOfflineQueue(prev => [...prev, qItem]);
-      setFerryBookings(prev => [qItem, ...prev]);
+      setFerryBookings(prev => {
+        if (prev.some(b => b.id === qItem.id)) return prev;
+        return [qItem, ...prev];
+      });
       toast('📥 Booking queued in offline storage', { icon: '📥' });
       return;
     }
 
     try {
       await setDoc(doc(db, 'ferryBookings', booking.id), booking);
-      setFerryBookings(prev => [booking, ...prev]);
+      setFerryBookings(prev => {
+        if (prev.some(b => b.id === booking.id)) return prev;
+        return [booking, ...prev];
+      });
     } catch (e) {
       console.warn("persistFerryBooking Error:", e);
     }
@@ -632,14 +665,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       const qItem = { ...booking, status: 'Queued' as const, queueType: 'vanBooking' };
       setOfflineQueue(prev => [...prev, qItem]);
-      setVanBookings(prev => [qItem, ...prev]);
+      setVanBookings(prev => {
+        if (prev.some(b => b.id === qItem.id)) return prev;
+        return [qItem, ...prev];
+      });
       toast('📥 Booking queued in offline storage', { icon: '📥' });
       return;
     }
 
     try {
       await setDoc(doc(db, 'vanBookings', booking.id), booking);
-      setVanBookings(prev => [booking, ...prev]);
+      setVanBookings(prev => {
+        if (prev.some(b => b.id === booking.id)) return prev;
+        return [booking, ...prev];
+      });
     } catch (e) {
       console.warn("persistVanBooking Error:", e);
     }
@@ -757,10 +796,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (isOnline) {
         await setDoc(doc(db, 'transactions', id), nextTx);
       }
-      setTransactions(prev => [nextTx, ...prev]);
+      setTransactions(prev => {
+        if (prev.some(t => t.id === nextTx.id)) return prev;
+        return [nextTx, ...prev];
+      });
     } catch (err) {
       console.warn("addTransaction Cache write fallback:", err);
-      setTransactions(prev => [nextTx, ...prev]);
+      setTransactions(prev => {
+        if (prev.some(t => t.id === nextTx.id)) return prev;
+        return [nextTx, ...prev];
+      });
     }
   };
 
@@ -786,6 +831,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userAccount, setUserAccount,
       userAccounts, setUserAccounts,
       adminAccounts, setAdminAccounts,
+      isDarkMode, setIsDarkMode,
       
       // Functions
       addTransaction,

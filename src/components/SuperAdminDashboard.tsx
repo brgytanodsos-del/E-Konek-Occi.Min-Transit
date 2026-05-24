@@ -26,7 +26,9 @@ export const SuperAdminDashboard = () => {
     formatPST,
     updateTransaction,
     persistPayout,
-    setUserAccount
+    setUserAccount,
+    isDarkMode,
+    setIsDarkMode
   } = useApp();
 
   const navigate = useNavigate();
@@ -114,12 +116,21 @@ export const SuperAdminDashboard = () => {
           <div className="flex-1 flex flex-col">
             <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-xs">
               <span className="font-extrabold text-[#003580] tracking-tight text-sm">Abra Port Station</span>
-              <button
-                onClick={handleLogoutAction}
-                className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
-              >
-                Logout 🚢
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  title="Toggle visual theme"
+                >
+                  {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
+                </button>
+                <button
+                  onClick={handleLogoutAction}
+                  className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                >
+                  Logout 🚢
+                </button>
+              </div>
             </header>
             <div className="flex-1">
               <Panel1 isSuperAdmin={false} />
@@ -132,12 +143,21 @@ export const SuperAdminDashboard = () => {
           <div className="flex-1 flex flex-col">
             <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-xs">
               <span className="font-extrabold text-[#003580] tracking-tight text-sm">Mamburao dispatch Panel</span>
-              <button
-                onClick={handleLogoutAction}
-                className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
-              >
-                Logout 🚐
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  title="Toggle visual theme"
+                >
+                  {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
+                </button>
+                <button
+                  onClick={handleLogoutAction}
+                  className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                >
+                  Logout 🚐
+                </button>
+              </div>
             </header>
             <div className="flex-1">
               <Panel2 isSuperAdmin={false} />
@@ -150,12 +170,21 @@ export const SuperAdminDashboard = () => {
           <div className="flex-1 flex flex-col">
             <header className="dashboard-header rounded-b-[24px] bg-white/65 py-4 px-6 flex justify-between items-center z-10">
               <span className="text-[10px] uppercase font-black tracking-widest text-[#003580]/50 font-sans">Public Station Access</span>
-              <button
-                onClick={handleLogoutAction}
-                className="text-xs text-[#003580] font-black hover:text-red-500 transition cursor-pointer"
-              >
-                Exit Portal
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  title="Toggle visual theme"
+                >
+                  {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
+                </button>
+                <button
+                  onClick={handleLogoutAction}
+                  className="text-xs text-[#003580] font-black hover:text-red-500 transition cursor-pointer"
+                >
+                  Exit Portal
+                </button>
+              </div>
             </header>
             <div className="flex-1">
               <Panel3 isSuperAdmin={false} />
@@ -175,7 +204,14 @@ export const SuperAdminDashboard = () => {
               </div>
 
               {/* Secure Confirm Logout */}
-              <div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xs"
+                  title="Toggle visual theme"
+                >
+                  {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
+                </button>
                 {!showConfirmLogout ? (
                   <button
                     onClick={() => setShowConfirmLogout(true)}

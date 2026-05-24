@@ -271,15 +271,12 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       accountId: userAccount?.id || null
     };
 
+    const updatedVoyage = { ...selVoyage, available: Math.max(0, selVoyage.available - 1) };
     if (isOnline) {
-      const updatedVoyage = { ...selVoyage, available: Math.max(0, selVoyage.available - 1) };
-      setFerryBookings(prev => [...prev, newBookingObj]);
       setShips(prev => prev.map(s => s.id === voyageId ? updatedVoyage : s));
-      persistFerryBooking(newBookingObj).catch(console.error);
       persistShip(updatedVoyage).catch(console.error);
-    } else {
-      setOfflineQueue(prev => [...prev, newBookingObj]);
     }
+    persistFerryBooking(newBookingObj).catch(console.error);
 
     setBookingConfirmation({
       id: bookingId,
@@ -340,15 +337,12 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       accountId: userAccount?.id || null
     };
 
+    const updatedTrip = { ...selTrip, available: Math.max(0, selTrip.available - count) };
     if (isOnline) {
-      const updatedTrip = { ...selTrip, available: Math.max(0, selTrip.available - count) };
-      setVanBookings(prev => [...prev, newBookingObj]);
       setTrips(prev => prev.map(t => t.id === tripId ? updatedTrip : t));
-      persistVanBooking(newBookingObj).catch(console.error);
       persistTrip(updatedTrip).catch(console.error);
-    } else {
-      setOfflineQueue(prev => [...prev, newBookingObj]);
     }
+    persistVanBooking(newBookingObj).catch(console.error);
 
     setBookingConfirmation({
       id: bookingId,

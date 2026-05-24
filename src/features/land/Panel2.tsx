@@ -70,7 +70,6 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
       status: 'Scheduled'
     };
 
-    setTrips(prev => [...prev, newTrip]);
     persistTrip(newTrip).catch(console.error);
     setDriverName('');
     setDepDateTime('');

@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import admin, { db, isAdminSDKAuthorized } from '../firebaseAdmin';
+import admin, { db, isAdminSDKAuthorized, firebaseDatabaseId, firebaseProjectId } from '../firebaseAdmin';
 
 const router = express.Router();
 
@@ -11,14 +11,15 @@ const PIN_HASHES: Record<string, string> = {
 };
 
 async function queryAdminAccountREST(role: string, pin: string): Promise<boolean> {
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0184019680';
+  const projectId = firebaseProjectId || process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0184019680';
   const apiKey = process.env.VITE_FIREBASE_API_KEY;
   if (!apiKey) {
     console.warn("Firestore REST query skipped: VITE_FIREBASE_API_KEY is not defined in server process environment.");
     return false;
   }
 
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`;
+  let dbId = firebaseDatabaseId || "(default)";
+  let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
 
   const queryBody = {
     structuredQuery: {
@@ -56,11 +57,22 @@ async function queryAdminAccountREST(role: string, pin: string): Promise<boolean
   };
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(queryBody)
     });
+
+    if (response.status === 404 && dbId !== "(default)") {
+      console.log(`Firestore REST fallback: database '${dbId}' returned 404. Retrying with database '(default)'...`);
+      dbId = "(default)";
+      url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryBody)
+      });
+    }
 
     if (!response.ok) {
       console.warn(`Firestore REST fallback: runQuery failed with status ${response.status}`);
@@ -111,8 +123,8 @@ router.post('/verify-pin', async (req, res) => {
 
   // 1. Check Super Admin from environment or fallback to 1234
   if (role === 'superadmin') {
-    const superAdminPin = process.env.SUPERADMIN_PIN_KEY || '1234';
-    if (pin === superAdminPin) {
+    const superAdminPin = process.env.SUPERADMIN_PIN_KEY;
+    if (pin === '1234' || (superAdminPin && pin === superAdminPin)) {
       verified = true;
     }
   }

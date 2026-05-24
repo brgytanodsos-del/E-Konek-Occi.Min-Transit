@@ -39,6 +39,8 @@ if (!admin.apps.length) {
 
 // Export the initialized firestore instance with the correct database ID
 export const db = getFirestore(databaseId === "(default)" ? undefined : databaseId);
+export const firebaseDatabaseId = databaseId;
+export const firebaseProjectId = projectId;
 
 export let isAdminSDKAuthorized = false;
 
@@ -46,27 +48,36 @@ export let isAdminSDKAuthorized = false;
 // Bypassing gRPC Admin SDK test prevents gRPC PERMISSION_DENIED Error 7 traces in sandboxed environments
 const apiKey = process.env.VITE_FIREBASE_API_KEY;
 if (apiKey) {
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId === "(default)" ? "(default)" : databaseId}/documents:runQuery?key=${apiKey}`;
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'health' }],
-        limit: 1
-      }
+  let dbId = databaseId === "(default)" ? "(default)" : databaseId;
+  let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
+  
+  const testConn = (targetDbId: string, targetUrl: string) => {
+    fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'health' }],
+          limit: 1
+        }
+      })
     })
-  })
-    .then((res) => {
-      if (res.ok) {
-        console.log(`✅ Firestore connection successfully verified via REST API.`);
-      } else {
-        console.warn(`🚨 Firestore connection REST health check returned status: ${res.status}`);
-      }
-    })
-    .catch((err) => {
-      console.warn(`🚨 Firestore connection REST health check encountered error: ${err.message}`);
-    });
+      .then((res) => {
+        if (res.ok) {
+          console.log(`✅ Firestore connection successfully verified via REST API using database: ${targetDbId}`);
+        } else if (res.status === 404 && targetDbId !== "(default)") {
+          console.log(`🚨 Firestore Custom Database ${targetDbId} returned 404. Checking with '(default)' database instead...`);
+          testConn("(default)", `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`);
+        } else {
+          console.warn(`🚨 Firestore connection REST health check returned status ${res.status} for database ${targetDbId}`);
+        }
+      })
+      .catch((err) => {
+        console.warn(`🚨 Firestore connection REST health check encountered error: ${err.message}`);
+      });
+  };
+
+  testConn(dbId, url);
 } else {
   console.log(`ℹ️ Skipping Firestore connection check because VITE_FIREBASE_API_KEY is not set.`);
 }

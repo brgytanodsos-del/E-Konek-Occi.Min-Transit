@@ -90,7 +90,6 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       type: vesselType,
     };
 
-    setShips(prev => [...prev, newShipObj]);
     persistShip(newShipObj).catch(console.error);
 
     setVesselName('');
@@ -115,7 +114,6 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       date: new Date().toISOString(),
       author: authorName
     };
-    setAnnouncements(prev => [notice, ...prev]);
     persistAnnouncement(notice).catch(console.error);
     setNewNotice('');
     setToastMessage("📢 Announcement posted successfully!");

@@ -84,7 +84,7 @@ export const LoginScreen = () => {
   const [isStaffReg, setIsStaffReg] = useState(false);
   const [prefillType, setPrefillType] = useState<'passenger' | 'driver' | undefined>();
 
-  const { setCurrentRole, setIsAuthenticated, setSessionToken, setAuditLog, isOnline, userAccount, setUserAccount } = useApp();
+  const { setCurrentRole, setIsAuthenticated, setSessionToken, setAuditLog, isOnline, userAccount, setUserAccount, isDarkMode, setIsDarkMode } = useApp();
   const navigate = useNavigate();
 
   const activeRoleObj = useMemo(() => roleOptions.find((role) => role.value === selectedRole) ?? null, [selectedRole]);
@@ -122,7 +122,7 @@ export const LoginScreen = () => {
     setSuccessFlash(false);
   };
 
-  const pinLength = 4;
+  const pinLength = selectedRole === 'superadmin' ? 6 : 4;
 
   const handlePinDigitTap = (digit: number) => {
     if (pin.length < pinLength && !successFlash && !loading) {
@@ -137,7 +137,8 @@ export const LoginScreen = () => {
   };
 
   const handlePinSubmit = async () => {
-    if (pin.length < pinLength || loading || successFlash) return;
+    const minLen = selectedRole === 'superadmin' ? 4 : pinLength;
+    if (pin.length < minLen || loading || successFlash) return;
 
     setLoading(true);
     setErrorMsg('');
@@ -254,9 +255,18 @@ export const LoginScreen = () => {
                 <p className="text-sm font-bold text-slate-900">MindoroTransit operations portal</p>
               </div>
             </div>
-            <StatusChip tone={isOnline ? 'success' : 'danger'} dot>
-              {isOnline ? 'Live network' : 'Cached mode'}
-            </StatusChip>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/75 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:scale-105 active:scale-95 dark:border-slate-800/80 dark:bg-slate-900/75 dark:text-slate-200 dark:hover:bg-slate-900 cursor-pointer"
+                title="Toggle visual theme"
+              >
+                {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-indigo-500" />}
+              </button>
+              <StatusChip tone={isOnline ? 'success' : 'danger'} dot>
+                {isOnline ? 'Live network' : 'Cached mode'}
+              </StatusChip>
+            </div>
           </div>
 
           <PanelHero
@@ -478,7 +488,7 @@ export const LoginScreen = () => {
                       onClick={handlePinSubmit}
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
-                      disabled={loading || pin.length < pinLength}
+                      disabled={loading || pin.length < (selectedRole === 'superadmin' ? 4 : pinLength)}
                       className="tap-target rounded-2xl bg-gradient-to-r from-[#0f8b66] to-[#0b6b72] px-3 py-4 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-[0_16px_30px_rgba(15,139,102,0.24)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       {loading ? '...' : 'Enter'}

@@ -7,6 +7,13 @@
 }
 
 /* Base custom styles */
+html.dark {
+  color-scheme: dark;
+}
+html.dark body {
+  background-color: #0a1120;
+}
+
 body {
   background-color: #F0F4F8;
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -14,6 +21,11 @@ body {
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+}
+
+/* Smooth transitions for theme changes */
+body, .glass-panel, .dashboard-statusbar, .dashboard-header, .dashboard-nav, button, input, select, textarea, .surface-card, div, section, header, nav {
+  transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 250ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms ease-out, box-shadow 200ms ease;
 }
 
 /* Minimum interactive target size */
@@ -83,4 +95,109 @@ button, input, select, textarea {
   .no-print {
     display: none !important;
   }
+}
+
+/* Glass Panels & Surface Card Polishing Overrides */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(226, 232, 240, 0.75);
+  box-shadow: 0 10px 30px -4px rgba(12, 45, 87, 0.04);
+}
+
+html.dark .glass-panel {
+  background: rgba(13, 20, 38, 0.65);
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 35px -4px rgba(0, 0, 0, 0.25);
+}
+
+.surface-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.84);
+  border-radius: 20px;
+  box-shadow: 0 4px 18px -2px rgba(15, 23, 42, 0.02), 0 2px 6px -1px rgba(15, 23, 42, 0.01);
+}
+
+html.dark .surface-card {
+  background-color: #111a2e;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Dashboard Headers & High-Fidelity Blurred Controls */
+.dashboard-header {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+html.dark .dashboard-header {
+  background-color: rgba(10, 17, 32, 0.82) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dashboard-nav {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+html.dark .dashboard-nav {
+  background-color: rgba(10, 17, 32, 0.92) !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Systemic Universal High-Contrast Transitions for Native Tailwind Utilities */
+html.dark .text-slate-900, html.dark .text-slate-950, html.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-500, html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .bg-white {
+  background-color: #111a2e !important;
+}
+
+html.dark .bg-slate-50, html.dark .bg-slate-100 {
+  background-color: #182235 !important;
+}
+
+html.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+html.dark .border-slate-200, html.dark .border-slate-200\/70, html.dark .border-slate-100 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Modern Rounded Smooth-Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.16);
+  border-radius: 99px;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
