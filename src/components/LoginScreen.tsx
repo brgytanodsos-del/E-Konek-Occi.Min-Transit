@@ -122,7 +122,7 @@ export const LoginScreen = () => {
     setSuccessFlash(false);
   };
 
-  const pinLength = selectedRole === 'superadmin' ? 6 : 4;
+  const pinLength = 4;
 
   const handlePinDigitTap = (digit: number) => {
     if (pin.length < pinLength && !successFlash && !loading) {

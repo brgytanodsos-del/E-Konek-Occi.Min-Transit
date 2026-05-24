@@ -27,13 +27,9 @@ router.post('/verify-pin', async (req, res) => {
 
   let verified = false;
 
-  // 1. Check Super Admin from environment (6 digits)
+  // 1. Check Super Admin from environment or fallback to 1234
   if (role === 'superadmin') {
-    const superAdminPin = process.env.SUPERADMIN_PIN_KEY;
-    if (!superAdminPin) {
-      console.error("FATAL: SUPERADMIN_PIN_KEY not set in environment");
-      return res.status(500).json({ success: false, message: 'System security configuration missing.' });
-    }
+    const superAdminPin = process.env.SUPERADMIN_PIN_KEY || '1234';
     if (pin === superAdminPin) {
       verified = true;
     }
