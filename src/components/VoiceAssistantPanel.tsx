@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Volume2, X, HelpCircle, VolumeX, Languages, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { startVoiceCommand } from '../features/voiceCommands';
 import { tts } from '../features/ttsService';
 import { speakWithElevenLabs } from '../features/elevenLabs';
 import { toast } from 'sonner';
+import { VoiceInstructionsModal } from './VoiceInstructionsModal';
 
 interface VoiceAssistantPanelProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
   const [listening, setListening] = useState(false);
   const [voiceModel, setVoiceModel] = useState<'browser' | 'elevenlabs'>('browser');
   const [language, setLanguage] = useState<'en' | 'tl'>('en');
+  const [isContinuous, setIsContinuous] = useState(false);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   // Cancel speech on close
   useEffect(() => {
@@ -34,19 +38,29 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
     }
   };
 
+  const stopListening = () => {
+    setListening(false);
+    recognitionRef.current?.stop();
+  };
+
   const startListening = () => {
+    if (listening) {
+      stopListening();
+      return;
+    }
+    
     setListening(true);
     
     // Callback handlers for voice recognitions
     const onTriggerBooking = () => {
-      setListening(false);
+      if (!isContinuous) setListening(false);
       onClose();
       // Dispatch an event to notify booking components to open
       window.dispatchEvent(new CustomEvent('open-public-booking'));
     };
 
     const onCheckStatus = () => {
-      setListening(false);
+      if (!isContinuous) setListening(false);
     };
 
     // Modified helper starts recognition
@@ -71,7 +85,7 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
       toast.info(language === 'en' ? "🎙️ Recording English/Taglish command..." : "🎙️ Nakikinig sa Tagalog command...");
 
       recognition.onresult = (event: any) => {
-        setListening(false);
+        if (!isContinuous) setListening(false);
         const command = event.results[0][0].transcript.toLowerCase().trim();
         toast.success(`Recognized: "${command}"`);
 
@@ -95,33 +109,40 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
           const weatherEn = `Weather update. Mamburao terminal is at ${mamTemp.toFixed(1)} degrees celsius. Abra port windspeed is ${abraWind.toFixed(1)} kilometers per hour.`;
           const weatherTl = `Impormasyon sa panahon. Ang temperatura sa Mamburao ay ${mamTemp.toFixed(1)} degrees celsius. Ang bilis ng hangin sa Abra port ay ${abraWind.toFixed(1)} kilometro bawat oras.`;
           handleSpeak(weatherEn, weatherTl);
-          setListening(false);
+          if (!isContinuous) setListening(false);
         } else if (command.includes("magandang umaga") || command.includes("good morning")) {
           handleSpeak("Good morning! Welcome to Mindoro Transit Hub.", "Magandang umaga po! Maligayang pagdating sa Mindoro Transit Hub.");
-          setListening(false);
+          if (!isContinuous) setListening(false);
         } else if (command.includes("salamat") || command.includes("thank you")) {
           handleSpeak("You're welcome! Thank you for using Mindoro Transit.", "Walang anuman po! Salamat sa paggamit ng Mindoro Transit.");
-          setListening(false);
+          if (!isContinuous) setListening(false);
         } else {
           // default
           const fallbackEn = `Heard: "${command}". Try speaking: Book, Status, or Weather.`;
           const fallbackTl = `Narinig: "${command}". Subukan sabihin: Book, Kalagayan, o Panahon.`;
           handleSpeak(fallbackEn, fallbackTl);
-          setListening(false);
+          if (!isContinuous) setListening(false);
         }
       };
 
       recognition.onerror = (e: any) => {
         console.warn("Recognition error:", e);
-        toast.error("Could not capture speech. Please speak clearly.");
-        setListening(false);
+        if (!isContinuous) {
+            toast.error("Could not capture speech. Please speak clearly.");
+            setListening(false);
+        }
       };
 
       recognition.onend = () => {
-        setListening(false);
+        if (isContinuous && listening) {
+            try { recognition.start(); } catch(e) {}
+        } else {
+            setListening(false);
+        }
       };
 
       recognition.start();
+      recognitionRef.current = recognition;
 
     } catch (err) {
       console.error(err);
@@ -147,14 +168,25 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Mindoro Transit Copilot</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full cursor-pointer transition select-none"
-            type="button"
-          >
-            <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsInstructionsOpen(true)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full cursor-pointer transition select-none"
+              type="button"
+            >
+              <HelpCircle className="w-5 h-5 text-gray-400 hover:text-orange transition" />
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full cursor-pointer transition select-none"
+              type="button"
+            >
+              <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+            </button>
+          </div>
         </div>
+
+        <VoiceInstructionsModal isOpen={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)} />
 
         {/* Configuration settings (exclusive premium enhancements) */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -210,10 +242,19 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
           </div>
         </div>
 
+        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl flex items-center justify-between mb-6">
+          <span className="text-xs font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Continuous Listening</span>
+          <button
+            onClick={() => setIsContinuous(!isContinuous)}
+            className={`w-12 h-6 rounded-full p-1 transition-all ${isContinuous ? 'bg-orange' : 'bg-slate-200 dark:bg-slate-700'}`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isContinuous ? 'translate-x-6' : ''}`} />
+          </button>
+        </div>
+
         {/* Huge Interactive Voice Push Button */}
         <button
           onClick={startListening}
-          disabled={listening}
           type="button"
           className={`w-full py-8 rounded-[24px] flex flex-col items-center justify-center cursor-pointer transition-all ${
             listening 

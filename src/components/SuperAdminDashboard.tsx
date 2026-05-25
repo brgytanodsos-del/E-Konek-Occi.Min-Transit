@@ -42,6 +42,36 @@ export const SuperAdminDashboard = () => {
   // Super Admin voice assistant modal
   const [isVoicePanelOpen, setIsVoicePanelOpen] = useState(false);
 
+  // Background Voice Listener
+  useEffect(() => {
+    if (isVoicePanelOpen) return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-PH';
+
+    recognition.onresult = (event: any) => {
+      const command = event.results[event.results.length - 1][0].transcript.toLowerCase();
+      if (command.includes("book") || command.includes("ferry") || command.includes("shuttle")) {
+        setIsVoicePanelOpen(true);
+      }
+    };
+
+    try {
+        recognition.start();
+    } catch (e) {
+        console.warn("Background voice listener start failed", e);
+    }
+
+    return () => {
+        try { recognition.stop(); } catch(e) {}
+    };
+  }, [isVoicePanelOpen]);
+
   // Redirect if unauthorized
   useEffect(() => {
     if (!isAuthenticated || !currentRole) {

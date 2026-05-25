@@ -246,33 +246,33 @@ export const LoginScreen = () => {
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl flex-col gap-6 lg:flex-row lg:items-stretch">
         <div className="flex flex-1 flex-col gap-6 lg:max-w-[46rem]">
           <div className="flex items-center justify-between">
-            <div className="glass-panel inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm text-slate-700">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(12,45,87,0.12)] text-[#0c2d57]">
+            <div className="glass-panel inline-flex items-center gap-4 rounded-2xl px-5 h-12 text-sm text-slate-700 bg-white shadow-sm border border-slate-100">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                 <Waves size={18} />
               </span>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">E-Konek Occi.Min Transit</p>
-                <p className="text-sm font-bold text-slate-900">MindoroTransit operations portal</p>
+                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">E-Konek Occi.Min Transit</p>
+                <p className="text-xs font-black text-slate-900 leading-none mt-0.5">MindoroTransit Operations</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:scale-105 active:scale-95 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-700 border border-slate-100 shadow-sm transition-all hover:bg-slate-50 active:scale-95 cursor-pointer"
                 title="Toggle visual theme"
               >
                 {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-indigo-600" />}
               </button>
-              <StatusChip tone={isOnline ? 'success' : 'danger'} dot>
+              <StatusChip tone={isOnline ? 'success' : 'danger'} dot className="h-12 px-6 rounded-2xl bg-white border border-slate-100 shadow-sm">
                 {isOnline ? 'Live network' : 'Cached mode'}
               </StatusChip>
             </div>
           </div>
 
           <PanelHero
-            eyebrow="Modern Filipino transit interface"
+            eyebrow="Modernong interface ng transportasyon"
             title="A cleaner, more professional control room for Occi.Min transit"
-            description="Built around a navy, emerald, and warm amber palette with a maritime feel—so the platform feels like a real transport product, not just a quick prototype."
+            description="Isang mas malinis, mas propesyonal na sistema at isang madaling gamitin na Web app para sa Occi.Min transit —kaya ang platform ay isang tunay na produkto ng transportasyon."
             badges={
               <>
                 <span className="brand-pill"><Ship size={14} /> Maritime operations</span>
