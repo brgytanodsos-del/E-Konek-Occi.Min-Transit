@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic } from 'lucide-react';
 import { VoiceAssistantPanel } from './VoiceAssistantPanel';
+import { PanelHeader } from './common/PanelHeader';
 
 import { AdminReportSectionPanel4 } from './AdminReportSectionPanel4';
 

@@ -27,6 +27,8 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     updateShipStatus: persistShipStatus,
     updateBookingStatus,
     userAccounts,
+    auditLog,
+    setAuditLog,
   } = useApp();
 
   // Create voyages state
@@ -83,6 +85,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       toast.success('Ticket already confirmed.');
       return;
     }
+    setAuditLog(prev => [...prev, { timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_VALIDATION_${booking.id}` }]);
     handleConfirmBooking(booking);
   };
 

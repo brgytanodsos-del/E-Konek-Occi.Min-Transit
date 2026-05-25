@@ -9,6 +9,19 @@ import {
   getDocs,
   getDoc
 } from 'firebase/firestore';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import { 
+  getStorage, 
+  ref, 
+  uploadBytes, 
+  getDownloadURL 
+} from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAAKNYFKegpsJH4NOHQTsp0vRNbKP6NMU4",
@@ -21,6 +34,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, "ai-studio-d31b7f09-688d-43bc-86f1-6bbb3e88699e");
+export const auth = getAuth(app);
+export const storage = getStorage(app);
+
+// Re-export Auth & Storage methods as requested
+export {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+};
 
 export async function fsSet(collectionName: string, docId: string, data: any) {
   const docRef = doc(db, collectionName, docId);

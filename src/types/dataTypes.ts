@@ -82,20 +82,26 @@ export interface AuditLog {
 
 export interface UserAccount {
   id: string;
-  accountType: 'passenger' | 'driver';
+  accountType: 'passenger';
   fullName: string;
   mobileNumber: string;
-  address?: string;
-  selfieUrl?: string;
+  selfieUrl: string;
+  gpsLocation: { lat: number; lng: number; formattedAddress: string };
+  email: string;
   createdAt: string;
   bookingIds: string[];
+  status: 'active';
 }
 
 export interface AdminAccount {
   id: string;
   fullName: string;
-  role: 'port' | 'terminal';
-  pin: string;
+  mobileNumber: string;
+  role: 'port' | 'terminal' | 'driver';
+  workId?: string;           // port staff only
+  terminalMemberId?: string; // terminal staff or driver
+  selfieUrl: string;
+  email: string;
   createdAt: string;
   lastLogin: string;
   status: 'active' | 'suspended' | 'pending';

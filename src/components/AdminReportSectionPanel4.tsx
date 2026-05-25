@@ -34,11 +34,21 @@ export const AdminReportSectionPanel4 = () => {
   const [newAdminPin, setNewAdminPin] = useState('');
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
  
-  const handleApproveAdmin = async (id: string, fullName: string) => {
+  const handleApproveAdmin = async (id: string, fullName: string, role: string) => {
     try {
-      const { fsUpdate } = await import('../lib/firebase');
-      await fsUpdate('adminAccounts', id, { status: 'active' });
-      alert(`Account for ${fullName} approved successfully!`);
+      const res = await fetch('/api/auth/approve-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uid: id, role })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Account for ${fullName} approved successfully! Custom claims set to role: ${role}.`);
+      } else {
+        alert(data.message || "Failed to approve account");
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to approve account");
@@ -320,7 +330,7 @@ export const AdminReportSectionPanel4 = () => {
                            </div>
                            <div className="flex gap-2">
                               <button 
-                                onClick={() => handleApproveAdmin(adm.id, adm.fullName)}
+                                onClick={() => handleApproveAdmin(adm.id, adm.fullName, adm.role)}
                                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition shadow-md"
                               >
                                 Approve
