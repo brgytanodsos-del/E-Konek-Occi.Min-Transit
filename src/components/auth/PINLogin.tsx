@@ -1,68 +1,128 @@
+/**
+ * PINLogin.tsx — FIXED
+ *
+ * Changes vs original:
+ * 1. Removed the client-side ROLE_MAP that exposed all PINs in the JS bundle.
+ * 2. Removed the "Demo Credentials" hint that printed every PIN on screen.
+ * 3. Authentication now calls /api/auth/verify-pin exclusively; the client
+ *    never decides whether a PIN is valid.
+ * 4. Added proper lockout tracking (mirrors server-side rate limiting).
+ * 5. Removed @ts-ignore — typed useApp correctly.
+ * 6. The PIN for 'passenger' flows directly to the public portal without a
+ *    PIN; this component is only shown to staff (port / terminal / superadmin).
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { Lock, ShieldCheck, AlertCircle } from 'lucide-react';
 
-const ROLE_MAP: Record<string, { role: string; label: string }> = {
-  '2001': { role: 'port', label: 'Port Administrator' },
-  '2002': { role: 'terminal', label: 'Terminal Administrator' },
-  '0000': { role: 'passenger', label: 'Passenger' },
-  '1234': { role: 'superadmin', label: 'Super Administrator' },
-  '3001': { role: 'driver', label: 'Driver' },
+interface PINLoginProps {
+  /**
+   * The role this login dialog is authenticating.
+   * Passed from LoginScreen after the user selects a role card.
+   * Never defaults to a PIN value in the client.
+   */
+  role: 'port' | 'terminal' | 'superadmin';
+  onSuccess: (sessionToken: string) => void;
+  onBack: () => void;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  port: 'Port Administrator',
+  terminal: 'Terminal Administrator',
+  superadmin: 'Super Administrator',
 };
 
-export const PINLogin: React.FC = () => {
-  // @ts-ignore
-  const { setCurrentRole, setIsAuthenticated } = useApp();
+export const PINLogin: React.FC<PINLoginProps> = ({ role, onSuccess, onBack }) => {
+  const { setCurrentRole, setIsAuthenticated, setSessionToken } = useApp();
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Client-side attempt counter so we can show a friendly message before the
+  // server's rate-limiter kicks in (server still enforces the hard limit).
+  const [attempts, setAttempts] = useState(0);
+  const MAX_CLIENT_ATTEMPTS = 5;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
     setPin(value);
     setError(false);
+    setErrorMsg('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pin) return;
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!pin || pin.length < 4 || isLoading || success) return;
+
+    if (attempts >= MAX_CLIENT_ATTEMPTS) {
+      setError(true);
+      setErrorMsg('Too many attempts. Please wait a moment before trying again.');
+      return;
+    }
 
     setIsLoading(true);
-    const mapping = ROLE_MAP[pin];
+    setError(false);
+    setErrorMsg('');
 
-    setTimeout(() => {
-      if (mapping) {
+    try {
+      const res = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, pin }),
+      });
+
+      const data: { success: boolean; sessionToken?: string; role?: string; message?: string } =
+        await res.json();
+
+      if (data.success && data.sessionToken) {
         setSuccess(true);
-        setCurrentRole(mapping.role);
-        setIsAuthenticated(true);
-        toast.success(`Welcome, ${mapping.label}`, {
-          description: `Logged in as ${mapping.role}`,
+        setSessionToken(data.sessionToken);
+        toast.success(`Welcome, ${ROLE_LABELS[role]}`, {
+          description: `Authenticated as ${role}`,
         });
-      } else {
-        setError(true);
-        toast.error('Invalid PIN', {
-          description: 'Please check your credentials and try again.',
-        });
+        // Brief visual feedback, then hand off
         setTimeout(() => {
-          setPin('');
-          setError(false);
+          setCurrentRole(role);
+          setIsAuthenticated(true);
+          onSuccess(data.sessionToken!);
         }, 600);
+      } else {
+        setAttempts((n) => n + 1);
+        setError(true);
+        setErrorMsg(data.message || 'Incorrect PIN. Please try again.');
+        setPin('');
+        if (navigator.vibrate) navigator.vibrate(80);
+        setTimeout(() => {
+          setError(false);
+          setErrorMsg('');
+        }, 2000);
       }
+    } catch {
+      setError(true);
+      setErrorMsg('Cannot reach the server. Check your connection and try again.');
+      setPin('');
+      setTimeout(() => {
+        setError(false);
+        setErrorMsg('');
+      }, 2500);
+    } finally {
       setIsLoading(false);
-    }, 600);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && pin.length === 4) {
-      handleSubmit(e as any);
+    if (e.key === 'Enter' && pin.length >= 4) {
+      handleSubmit();
     }
   };
 
@@ -70,23 +130,18 @@ export const PINLogin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-blue-950 to-zinc-950 flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Animated background elements */}
+      {/* Animated background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute top-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl opacity-0 animate-pulse"
-          style={{
-            animation: mounted ? 'float 6s ease-in-out infinite' : 'none',
-          }}
+          className="absolute top-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+          style={{ animation: mounted ? 'float 6s ease-in-out infinite' : 'none' }}
         />
         <div
-          className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl opacity-0 animate-pulse"
-          style={{
-            animation: mounted ? 'float 8s ease-in-out infinite 1s' : 'none',
-          }}
+          className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"
+          style={{ animation: mounted ? 'float 8s ease-in-out infinite 1s' : 'none' }}
         />
       </div>
 
-      {/* Main container */}
       <div
         className="w-full max-w-md relative z-10"
         style={{
@@ -95,65 +150,34 @@ export const PINLogin: React.FC = () => {
           transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
       >
-        {/* Logo and header section */}
+        {/* Header */}
         <div className="text-center mb-10">
-          <div
-            className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-blue-500/50 relative group cursor-pointer"
-            style={{
-              animation: mounted ? 'slideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
-            }}
-          >
-            {/* Animated glow ring */}
+          <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-blue-500/50 relative group">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-3xl opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-300" />
             <Lock size={48} className="text-white relative z-10" />
           </div>
-
-          <h1
-            className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 tracking-tight"
-            style={{
-              animation: mounted ? 'fadeInUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' : 'none',
-            }}
-          >
+          <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 tracking-tight">
             E-Konek
           </h1>
-
-          <p
-            className="text-zinc-400 mt-3 font-medium"
-            style={{
-              animation: mounted ? 'fadeInUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both' : 'none',
-            }}
-          >
-            Occidental Mindoro Transit
-          </p>
+          <p className="text-zinc-400 mt-3 font-medium">Occidental Mindoro Transit</p>
+          <p className="text-zinc-500 mt-1 text-sm">{ROLE_LABELS[role]}</p>
         </div>
 
-        {/* Form container */}
+        {/* Card */}
         <form
           onSubmit={handleSubmit}
           className={`bg-zinc-900/80 backdrop-blur-xl border rounded-3xl p-8 shadow-2xl transition-all duration-300 ${
             error
               ? 'border-red-500/50 shadow-red-500/20'
               : success
-                ? 'border-green-500/50 shadow-green-500/20'
-                : 'border-zinc-800 shadow-blue-500/10'
+              ? 'border-green-500/50 shadow-green-500/20'
+              : 'border-zinc-800 shadow-blue-500/10'
           }`}
-          style={{
-            animation: mounted ? 'fadeInUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both' : 'none',
-          }}
         >
-          <h2
-            className="text-2xl font-semibold text-center mb-2 text-white"
-            style={{
-              animation: mounted ? 'slideInRight 0.6s ease-out 0.4s both' : 'none',
-            }}
-          >
-            Secure Access
-          </h2>
-          <p className="text-center text-zinc-500 text-sm mb-8">
-            Enter your PIN to continue
-          </p>
+          <h2 className="text-2xl font-semibold text-center mb-2 text-white">Secure Access</h2>
+          <p className="text-center text-zinc-500 text-sm mb-8">Enter your PIN to continue</p>
 
-          {/* PIN Input Display */}
+          {/* PIN input */}
           <div className="mb-8 space-y-3">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
               PIN Code
@@ -161,26 +185,19 @@ export const PINLogin: React.FC = () => {
             <input
               type="password"
               inputMode="numeric"
-              maxLength={4}
+              maxLength={6}
               value={pin}
               onChange={handlePinChange}
               onKeyDown={handleKeyDown}
               placeholder="••••"
-              disabled={isLoading}
-              className={`w-full text-center text-6xl tracking-[20px] bg-zinc-950 border-2 focus:border-blue-500 rounded-2xl py-6 font-mono outline-none transition-all duration-300 ${
-                error
-                  ? 'border-red-500/50 shake'
-                  : success
-                    ? 'border-green-500/50'
-                    : 'border-zinc-700'
-              } ${isLoading ? 'opacity-50' : ''}`}
+              disabled={isLoading || success}
               autoFocus
-              style={{
-                animation: mounted ? 'slideUp 0.6s ease-out 0.5s both' : 'none',
-              }}
+              className={`w-full text-center text-6xl tracking-[20px] bg-zinc-950 border-2 focus:border-blue-500 rounded-2xl py-6 font-mono outline-none transition-all duration-300 text-white ${
+                error ? 'border-red-500/50' : success ? 'border-green-500/50' : 'border-zinc-700'
+              } ${isLoading ? 'opacity-50' : ''}`}
             />
 
-            {/* PIN dots visualization */}
+            {/* Dot indicators */}
             <div className="flex justify-center gap-3 mt-4">
               {[0, 1, 2, 3].map((index) => (
                 <div
@@ -190,196 +207,65 @@ export const PINLogin: React.FC = () => {
                       ? 'bg-gradient-to-r from-blue-400 to-cyan-400 scale-110 shadow-lg shadow-blue-500/50'
                       : 'bg-zinc-700'
                   }`}
-                  style={{
-                    animation:
-                      index < pinArray.length
-                        ? 'pulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                        : 'none',
-                  }}
                 />
               ))}
             </div>
           </div>
 
-          {/* Status indicators */}
-          {error && (
-            <div
-              className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 animate-pulse"
-              style={{
-                animation: 'slideDown 0.4s ease-out',
-              }}
-            >
-              <AlertCircle size={18} className="text-red-400" />
-              <span className="text-sm text-red-400">Invalid PIN. Try again.</span>
+          {/* Status messages */}
+          {error && errorMsg && (
+            <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2">
+              <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+              <span className="text-sm text-red-400">{errorMsg}</span>
             </div>
           )}
 
           {success && (
-            <div
-              className="mb-6 p-3 bg-green-500/10 border border-green-500/50 rounded-lg flex items-center gap-2"
-              style={{
-                animation: 'slideDown 0.4s ease-out',
-              }}
-            >
+            <div className="mb-6 p-3 bg-green-500/10 border border-green-500/50 rounded-lg flex items-center gap-2">
               <ShieldCheck size={18} className="text-green-400" />
               <span className="text-sm text-green-400">Authentication successful!</span>
             </div>
           )}
 
-          {/* Submit button */}
+          {/* Submit */}
           <Button
             type="submit"
             size="lg"
-            disabled={isLoading || !pin || pin.length < 4}
-            className={`text-lg py-7 w-full font-semibold transition-all duration-300 ${
-              isLoading ? 'opacity-50' : ''
-            }`}
-            style={{
-              animation: mounted ? 'slideUp 0.6s ease-out 0.6s both' : 'none',
-            }}
+            disabled={isLoading || !pin || pin.length < 4 || success}
+            className="text-lg py-7 w-full font-semibold"
           >
-            <span className="inline-flex items-center gap-2">
-              {isLoading ? (
-                <>
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <Lock size={20} />
-                  Login
-                </>
-              )}
-            </span>
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Verifying…
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <Lock size={20} />
+                Login
+              </span>
+            )}
           </Button>
 
-          {/* Demo PINs info */}
-          <div
-            className="text-center mt-8 text-xs text-zinc-500 space-y-2"
-            style={{
-              animation: mounted ? 'fadeIn 0.8s ease-out 0.8s both' : 'none',
-            }}
+          {/* Back link */}
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={isLoading}
+            className="mt-6 w-full text-center text-sm text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-40"
           >
-            <p className="font-semibold text-zinc-400">Demo Credentials:</p>
-            <div className="grid grid-cols-2 gap-2 text-zinc-600 text-left">
-              <p>• 2001 (Port Admin)</p>
-              <p>• 2002 (Terminal)</p>
-              <p>• 0000 (Passenger)</p>
-              <p>• 1234 (Super Admin)</p>
-              <p>• 3001 (Driver)</p>
-            </div>
-          </div>
+            ← Back to role selection
+          </button>
         </form>
       </div>
 
-      {/* CSS Animations */}
       <style>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
         @keyframes float {
-          0%, 100% {
-            opacity: 0;
-            transform: translateY(0px);
-          }
-          50% {
-            opacity: 0.5;
-            transform: translateY(-30px);
-          }
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.2);
-          }
-        }
-
-        @keyframes shake {
-          0%, 100% {
-            transform: translateX(0);
-          }
-          25% {
-            transform: translateX(-10px);
-          }
-          75% {
-            transform: translateX(10px);
-          }
-        }
-
-        .shake {
-          animation: shake 0.4s ease-in-out;
+          0%, 100% { opacity: 0.3; transform: translateY(0px); }
+          50% { opacity: 0.7; transform: translateY(-30px); }
         }
       `}</style>
     </div>

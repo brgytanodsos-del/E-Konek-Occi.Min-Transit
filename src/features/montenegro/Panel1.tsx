@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { motion, AnimatePresence } from 'motion/react';
 import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
+import { QRCodeScanner } from '../../components/common/QRCodeScanner';
 
 interface Panel1Props {
   isSuperAdmin: boolean;
@@ -60,6 +61,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
 
   // Active print ticket modal booking state
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Stats
   const ticketsSoldToday = ferryBookings.filter(b => b.status === 'Confirmed').length;
@@ -69,6 +71,20 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
 
   // Status options for dropdown
   const SHIP_STATUSES = ['Scheduled', 'Boarding', 'Departed', 'Delayed', 'Cancelled'];
+
+  const handleScanSuccess = (decodedText: string) => {
+    setShowScanner(false);
+    const booking = ferryBookings.find(b => b.id === decodedText);
+    if (!booking) {
+      toast.error('Invalid ticket ref: ' + decodedText);
+      return;
+    }
+    if (booking.status === 'Confirmed') {
+      toast.success('Ticket already confirmed.');
+      return;
+    }
+    handleConfirmBooking(booking);
+  };
 
   const handleCreateVoyage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,7 +351,15 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-        <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2"><span className="text-[#003087]"><i className="fa-solid fa-list-check"></i></span> Counter Reservations</h2>
+        <div className="flex justify-between items-center">
+            <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2"><span className="text-[#003087]"><i className="fa-solid fa-list-check"></i></span> Counter Reservations</h2>
+            <button
+                onClick={() => setShowScanner(true)}
+                className="bg-[#003087] text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-2 hover:bg-blue-900 transition-all"
+            >
+                <i className="fa-solid fa-qrcode"></i> Scan Ticket
+            </button>
+        </div>
         <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50 p-4 rounded-2xl">
           <input type="text" placeholder="Search passenger name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 border border-slate-200 bg-white rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#009E49]" />
           <div className="flex gap-2">
@@ -552,6 +576,13 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showScanner && (
+        <QRCodeScanner
+            onScanSuccess={handleScanSuccess}
+            onCancel={() => setShowScanner(false)}
+        />
       )}
     </div>
   );

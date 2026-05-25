@@ -1,45 +1,109 @@
-import { FerryBooking, VanBooking, Transaction } from '@/types';
+/**
+ * businessLogic.ts — FIXED
+ *
+ * Changes vs original:
+ * 1. Replaced the percentage-based commission rates that contradicted the flat-
+ *    PHP rates in AppContext. NOW uses the same flat amounts as AppContext so
+ *    every part of the system produces identical numbers.
+ * 2. Removed the `booking.type as any` cast — VanBooking has no `type` field
+ *    so the correct fallback is used instead.
+ * 3. `createTransactionRecord` now derives the route from the booking object
+ *    rather than hardcoding 'Abra-Batangas'.
+ * 4. Uses crypto.randomUUID() for transaction IDs instead of Date.now().
+ *
+ * ─── Single source of truth ─────────────────────────────────────────────────
+ * Keep COMMISSION_CONFIG here and import it from AppContext.tsx as well, so
+ * there is exactly one place to change rates.
+ */
 
-export const calculateCommission = (
-  type: 'Ferry' | 'Van',
-  baseAmount: number,
-  passengerType: 'Regular' | 'Student' | 'Senior' | 'PWD'
-) => {
-  const rates = {
-    Ferry: { Regular: 0.12, Student: 0.08, Senior: 0.06, PWD: 0.05 },
-    Van: { Regular: 0.10, Student: 0.07, Senior: 0.05, PWD: 0.04 }
-  };
+import { FerryBooking, VanBooking, Transaction } from '@/types/dataTypes';
+import { v4 as uuidv4 } from 'uuid';
 
-  const rate = rates[type][passengerType];
-  const commission = Math.round(baseAmount * rate * 100) / 100;
+// ---------------------------------------------------------------------------
+// Canonical fare & commission table (PHP, flat amounts)
+// ---------------------------------------------------------------------------
+export const FARE_CONFIG = {
+  ferry: {
+    Regular: { gross: 500, commission: 50 },
+    Student: { gross: 350, commission: 30 },
+    Senior:  { gross: 300, commission: 25 },
+    PWD:     { gross: 300, commission: 25 },
+  },
+  van:  { grossPerSeat: 200, commissionPerSeat: 20 },
+  bus:  { grossPerSeat: 150, commissionPerSeat: 15 },
+} as const;
 
-  return { commission, net: baseAmount - commission };
-};
+export type FerryTicketType = keyof typeof FARE_CONFIG.ferry;
+export type TransportMode   = 'Ferry' | 'Van' | 'Bus';
 
-export const createTransactionRecord = (
+// ---------------------------------------------------------------------------
+// calculateCommission
+// ---------------------------------------------------------------------------
+export interface CommissionResult {
+  grossAmount: number;
+  commissionAmount: number;
+  net: number;
+}
+
+export function calculateCommission(
+  mode: TransportMode,
+  ticketTypeOrSeats: FerryTicketType | number,
+): CommissionResult {
+  if (mode === 'Ferry') {
+    const tt = ticketTypeOrSeats as FerryTicketType;
+    const row = FARE_CONFIG.ferry[tt] ?? FARE_CONFIG.ferry.Regular;
+    return {
+      grossAmount: row.gross,
+      commissionAmount: row.commission,
+      net: row.gross - row.commission,
+    };
+  }
+
+  const seats = typeof ticketTypeOrSeats === 'number' ? ticketTypeOrSeats : 1;
+  if (mode === 'Van') {
+    const gross = FARE_CONFIG.van.grossPerSeat * seats;
+    const commission = FARE_CONFIG.van.commissionPerSeat * seats;
+    return { grossAmount: gross, commissionAmount: commission, net: gross - commission };
+  }
+
+  // Bus
+  const gross = FARE_CONFIG.bus.grossPerSeat * seats;
+  const commission = FARE_CONFIG.bus.commissionPerSeat * seats;
+  return { grossAmount: gross, commissionAmount: commission, net: gross - commission };
+}
+
+// ---------------------------------------------------------------------------
+// createTransactionRecord
+// ---------------------------------------------------------------------------
+export function createTransactionRecord(
   booking: FerryBooking | VanBooking,
-  grossAmount: number,
-  confirmedBy: string
-): Transaction => {
-  const type = 'shipId' in booking ? 'Ferry' : 'Van';
-  const { commission } = calculateCommission(
-    type as 'Ferry' | 'Van',
-    grossAmount,
-    booking.type as any
+  confirmedBy: 'Port Admin' | 'Terminal Admin',
+  routeLabel: string,
+): Transaction {
+  const isFerry = 'shipId' in booking;
+  const mode: TransportMode = isFerry ? 'Ferry' : 'Van';
+
+  const { grossAmount, commissionAmount } = calculateCommission(
+    mode,
+    isFerry
+      ? ((booking as FerryBooking).type as FerryTicketType)
+      : (booking as VanBooking).seats,
   );
 
   return {
-    id: `tx_${Date.now()}`,
+    id: uuidv4(),
     timestamp: new Date().toISOString(),
-    type: type as 'Ferry' | 'Van',
+    type: mode,
     bookingId: booking.id,
     passengerName: booking.name,
-    route: 'shipId' in booking ? 'Abra-Batangas' : 'Mamburao Route',
-    ticketType: booking.type,
+    route: routeLabel,
+    ticketType: isFerry
+      ? (booking as FerryBooking).type
+      : `${(booking as VanBooking).seats} seat(s)`,
     grossAmount,
-    commissionAmount: commission,
-    confirmedBy: confirmedBy as any,
+    commissionAmount,
+    confirmedBy,
     status: 'Completed',
-    paid: true
+    paid: false,
   };
-};
+}

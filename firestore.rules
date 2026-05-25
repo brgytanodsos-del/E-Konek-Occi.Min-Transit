@@ -1,78 +1,136 @@
 rules_version = '2';
 
+/**
+ * firestore.rules — FIXED
+ *
+ * Changes vs original:
+ * 1. ferryBookings / vanBookings read: passengers now only see their OWN
+ *    bookings (accountId == request.auth.uid). Staff and admins can still
+ *    read all records for operational purposes.
+ * 2. adminAccounts: added explicit deny for non-super-admin reads so that
+ *    port/terminal admins cannot enumerate other admin records (and their
+ *    stored PIN hashes).
+ * 3. payoutHistory: locked to admins — was previously unspecified (implicitly
+ *    deny, but now explicit).
+ * 4. auditLogs renamed to auditLog to match the collection used in code.
+ * 5. Added catch-all deny at the bottom for any collection not explicitly
+ *    listed.
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isSuperAdmin() {
       return request.auth != null && request.auth.token.role == 'superadmin';
     }
-    
+
     function isPortAdmin() {
       return request.auth != null && request.auth.token.role == 'port';
     }
-    
+
     function isTerminalAdmin() {
       return request.auth != null && request.auth.token.role == 'terminal';
     }
 
-    // Ships & Trips - Read for all authenticated, Write for admins
+    function isStaffOrAdmin() {
+      return isPortAdmin() || isTerminalAdmin() || isSuperAdmin();
+    }
+
+    function isOwner(accountId: string) {
+      return isAuthenticated() && request.auth.uid == accountId;
+    }
+
+    // ── Ships ─────────────────────────────────────────────────────────────────
     match /ships/{shipId} {
-      allow read: if isAuthenticated();
+      allow read:             if isAuthenticated();
       allow create, update, delete: if isPortAdmin() || isSuperAdmin();
     }
-    
+
+    // ── Trips ─────────────────────────────────────────────────────────────────
     match /trips/{tripId} {
-      allow read: if isAuthenticated();
+      allow read:  if isAuthenticated();
       allow write: if isTerminalAdmin() || isSuperAdmin();
     }
 
-    // Bookings - Critical protection
+    // ── Ferry Bookings ────────────────────────────────────────────────────────
+    // Passengers can only read their own bookings (accountId == uid).
+    // Staff can read all for operational management.
     match /ferryBookings/{bookingId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaffOrAdmin()
+                  || (isAuthenticated() && resource.data.accountId == request.auth.uid);
       allow create: if isAuthenticated();
-      allow update, delete: if isPortAdmin() || isSuperAdmin() || 
-        (resource.data.accountId == request.auth.uid);
+      allow update, delete: if isPortAdmin()
+                            || isSuperAdmin()
+                            || isOwner(resource.data.accountId);
     }
 
+    // ── Van Bookings ──────────────────────────────────────────────────────────
     match /vanBookings/{bookingId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaffOrAdmin()
+                  || (isAuthenticated() && resource.data.accountId == request.auth.uid);
       allow create: if isAuthenticated();
-      allow update, delete: if isTerminalAdmin() || isSuperAdmin() || 
-        (resource.data.accountId == request.auth.uid);
+      allow update, delete: if isTerminalAdmin()
+                            || isSuperAdmin()
+                            || isOwner(resource.data.accountId);
     }
 
-    // Transactions (Financial) - Strict control
+    // ── Transactions (financial — strict) ─────────────────────────────────────
     match /transactions/{txId} {
-      allow read: if isPortAdmin() || isTerminalAdmin() || isSuperAdmin();
-      allow create: if isPortAdmin() || isTerminalAdmin() || isSuperAdmin();
-      allow update: if isSuperAdmin(); // Only super admin can modify completed tx
+      allow read:   if isStaffOrAdmin();
+      allow create: if isStaffOrAdmin();
+      allow update: if isSuperAdmin(); // Only super admin can modify a completed tx
+      allow delete: if false;          // Transactions are immutable; never delete
     }
 
-    // Announcements & Public Data
+    // ── Announcements (public read) ───────────────────────────────────────────
     match /announcements/{annId} {
-      allow read: if true;  // Public
+      allow read:  if true;  // Public — no auth required
       allow write: if isPortAdmin() || isSuperAdmin();
     }
 
-    // User Accounts
+    // ── User Accounts ─────────────────────────────────────────────────────────
     match /userAccounts/{userId} {
-      allow read, write: if request.auth.uid == userId || isSuperAdmin();
+      allow read, write: if isOwner(userId) || isSuperAdmin();
     }
 
-    // Audit Logs - Write-only for admins
-    match /auditLogs/{logId} {
-      allow read: if isSuperAdmin();
+    // ── Admin Accounts ────────────────────────────────────────────────────────
+    // Only super admin can read the list; individual admins cannot enumerate
+    // peers or see each other's hashed PINs.
+    match /adminAccounts/{adminId} {
+      allow read:   if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if false; // Hard-delete not allowed; set status='suspended' instead
+    }
+
+    // ── Audit Log ─────────────────────────────────────────────────────────────
+    match /auditLog/{logId} {
+      allow read:   if isSuperAdmin();
       allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
-    // Offline Queue (if you store it in Firestore)
+    // ── Payout History ────────────────────────────────────────────────────────
+    match /payoutHistory/{payoutId} {
+      allow read:   if isStaffOrAdmin();
+      allow create: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // ── Offline Queue (server-managed only) ───────────────────────────────────
     match /offlineQueue/{queueId} {
       allow read, write: if isSuperAdmin();
+    }
+
+    // ── Catch-all deny ────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
