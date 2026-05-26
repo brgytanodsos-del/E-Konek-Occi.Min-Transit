@@ -1,86 +1,55 @@
 rules_version = '2';
 
-/**
- * firestore.rules — FIXED
- *
- * Changes vs original:
- * 1. ferryBookings / vanBookings read: passengers now only see their OWN
- *    bookings (accountId == request.auth.uid). Staff and admins can still
- *    read all records for operational purposes.
- * 2. adminAccounts: added explicit deny for non-super-admin reads so that
- *    port/terminal admins cannot enumerate other admin records (and their
- *    stored PIN hashes).
- * 3. payoutHistory: locked to admins — was previously unspecified (implicitly
- *    deny, but now explicit).
- * 4. auditLogs renamed to auditLog to match the collection used in code.
- * 5. Added catch-all deny at the bottom for any collection not explicitly
- *    listed.
- */
-
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // ── Helpers ─────────────────────────────────────
+    function isAuthenticated() { return request.auth != null; }
+    function isSuperAdmin() { return request.auth != null && request.auth.token.role == 'superadmin'; }
+    function isPortAdmin() { return request.auth != null && request.auth.token.role == 'port'; }
+    function isTerminalAdmin() { return request.auth != null && request.auth.token.role == 'terminal'; }
+    function isStaffOrAdmin() { return isPortAdmin() || isTerminalAdmin() || isSuperAdmin(); }
+    function isOwner(uid) { return request.auth.uid == uid; }
 
-    // ── Helper functions ──────────────────────────────────────────────────────
-
-    function isAuthenticated() {
-      return request.auth != null;
+    function isValidTimestamp() {
+      return request.resource.data.syncedAt is timestamp &&
+             request.resource.data.syncedAt == request.time;
     }
 
-    function isSuperAdmin() {
-      return request.auth != null && request.auth.token.role == 'superadmin';
-    }
-
-    function isPortAdmin() {
-      return request.auth != null && request.auth.token.role == 'port';
-    }
-
-    function isTerminalAdmin() {
-      return request.auth != null && request.auth.token.role == 'terminal';
-    }
-
-    function isStaffOrAdmin() {
-      return isPortAdmin() || isTerminalAdmin() || isSuperAdmin();
-    }
-
-    function isOwner(accountId: string) {
-      return isAuthenticated() && request.auth.uid == accountId;
-    }
-
-    // ── Ships ─────────────────────────────────────────────────────────────────
+    // ── Core Collections ────────────────────────────
     match /ships/{shipId} {
-      allow read:             if isAuthenticated();
-      allow create, update, delete: if isPortAdmin() || isSuperAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isPortAdmin();
     }
 
-    // ── Trips ─────────────────────────────────────────────────────────────────
     match /trips/{tripId} {
-      allow read:  if isAuthenticated();
-      allow write: if isTerminalAdmin() || isSuperAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isTerminalAdmin();
     }
 
-    // ── Ferry Bookings ────────────────────────────────────────────────────────
-    // Passengers can only read their own bookings (accountId == uid).
-    // Staff can read all for operational management.
     match /ferryBookings/{bookingId} {
-      allow read: if isStaffOrAdmin()
-                  || (isAuthenticated() && resource.data.accountId == request.auth.uid);
-      allow create: if isAuthenticated();
-      allow update, delete: if isPortAdmin()
-                            || isSuperAdmin()
-                            || isOwner(resource.data.accountId);
+      allow read: if isOwner(resource.data.accountId) || isStaffOrAdmin();
+      allow create: if isAuthenticated() && isValidTimestamp();
+      allow update: if (isOwner(resource.data.accountId) || isStaffOrAdmin()) && isValidTimestamp();
+      allow delete: if isSuperAdmin();
     }
 
-    // ── Van Bookings ──────────────────────────────────────────────────────────
     match /vanBookings/{bookingId} {
-      allow read: if isStaffOrAdmin()
-                  || (isAuthenticated() && resource.data.accountId == request.auth.uid);
-      allow create: if isAuthenticated();
-      allow update, delete: if isTerminalAdmin()
-                            || isSuperAdmin()
-                            || isOwner(resource.data.accountId);
+      allow read: if isOwner(resource.data.accountId) || isStaffOrAdmin();
+      allow create: if isAuthenticated() && isValidTimestamp();
+      allow update: if (isOwner(resource.data.accountId) || isStaffOrAdmin()) && isValidTimestamp();
+      allow delete: if isSuperAdmin();
     }
 
-    // ── Transactions (financial — strict) ─────────────────────────────────────
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Admin & Financial - stricter
+    match /adminAccounts/{adminId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     match /transactions/{txId} {
       allow read:   if isStaffOrAdmin();
       allow create: if isStaffOrAdmin();
@@ -88,39 +57,23 @@ service cloud.firestore {
       allow delete: if false;          // Transactions are immutable; never delete
     }
 
-    // ── Announcements (public read) ───────────────────────────────────────────
-    match /announcements/{annId} {
-      allow read:  if true;  // Public — no auth required
-      allow write: if isPortAdmin() || isSuperAdmin();
+    match /payoutHistory/{recordId} {
+      allow read, write: if isStaffOrAdmin();
     }
 
-    // ── User Accounts ─────────────────────────────────────────────────────────
-    match /userAccounts/{userId} {
-      allow read, write: if isOwner(userId) || isSuperAdmin();
-    }
-
-    // ── Admin Accounts ────────────────────────────────────────────────────────
-    // Only super admin can read the list; individual admins cannot enumerate
-    // peers or see each other's hashed PINs.
-    match /adminAccounts/{adminId} {
-      allow read:   if isSuperAdmin();
-      allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin();
-      allow delete: if false; // Hard-delete not allowed; set status='suspended' instead
-    }
-
-    // ── Audit Log ─────────────────────────────────────────────────────────────
     match /auditLog/{logId} {
-      allow read:   if isSuperAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if false;
+      allow read: if isStaffOrAdmin();
     }
 
-    // ── Payout History ────────────────────────────────────────────────────────
-    match /payoutHistory/{payoutId} {
-      allow read:   if isStaffOrAdmin();
-      allow create: if isSuperAdmin();
-      allow update, delete: if false;
+    // Weather & Announcements - read-heavy, offline friendly
+    match /announcements/{annId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaffOrAdmin();
+    }
+
+    match /weatherAlerts/{alertId} {
+      allow read: if isAuthenticated();
     }
 
     // ── Offline Queue (server-managed only) ───────────────────────────────────
@@ -128,9 +81,9 @@ service cloud.firestore {
       allow read, write: if isSuperAdmin();
     }
 
-    // ── Catch-all deny ────────────────────────────────────────────────────────
+    // ── Catch-all ───────────────────────────────────
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if false; // Explicit deny
     }
   }
 }

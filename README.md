@@ -79,6 +79,23 @@ npm run build
 firebase deploy --only hosting
 ```
 
+## 🔌 Advanced Offline Setup
+
+E-Konek is designed as an offline-first PWA, built to survive spotty maritime and provincial connectivity.
+
+### Core Architecture
+- **Workbox Service Worker**: Caches static assets, API responses, and handles background sync.
+- **Dexie.js (IndexedDB)**: Durable, asynchronous database. We rely on Dexie instead of simple key-value stores to support advanced queries and large queue management.
+- **Custom Offline Queue**: `src/lib/offlineQueue.ts` intercepts operations when offline and stores them via Dexie. Handles retries with exponential backoff.
+- **Conflict Resolution**: Custom solver located in `src/lib/conflictResolver.ts`. Built-in strategies include 'admin-override' and 'business-rule' for seat booking conflict management.
+- **Zustand Sync Store**: Global tracking of connection state (`online`/`offline`) and pending operation queues. Powers the UI `<SyncStatus />` indicator.
+
+### Testing Offline Mode
+1. Open Chrome DevTools (F12) -> Network panel.
+2. Change "No throttling" to "Offline".
+3. Perform a booking or operation. You will see the queue indicator appear.
+4. Switch back to "No throttling" - the service worker and app listener will automatically fire and push the queued operations to Firestore.
+
 ---
 
 ## 📸 Screenshots

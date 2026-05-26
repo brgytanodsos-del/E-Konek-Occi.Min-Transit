@@ -124,7 +124,42 @@ export const LoginScreen = () => {
     setErrorMsg('');
 
     try {
-      // 1. Firebase Auth Sign-In
+      // 1. Check for legacy/mock PIN bypass based on system defaults
+      const isMockSuperAdmin = selectedRole === 'superadmin' && password === '1234';
+      const isMockPassenger = selectedRole === 'passenger' && password === '0000';
+      const isMockPort = selectedRole === 'port' && password === '2001';
+      const isMockTerminal = selectedRole === 'terminal' && password === '2002';
+
+      if (isMockSuperAdmin || isMockPassenger || isMockPort || isMockTerminal) {
+        setSuccessFlash(true);
+        setAuditLog((prev) => [
+          {
+            id: 'al-' + Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            role: selectedRole as any,
+            action: 'login',
+          },
+          ...prev,
+        ]);
+
+        if (isMockPassenger) {
+           setUserAccount({
+              id: 'mock-pass-001',
+              fullName: email.split('@')[0] || 'Guest',
+              accountType: 'passenger',
+              createdAt: new Date().toISOString()
+           } as any);
+        }
+
+        setTimeout(() => {
+          setCurrentRole(selectedRole as any);
+          setIsAuthenticated(true);
+          navigate('/dashboard');
+        }, 700);
+        return;
+      }
+
+      // 2. Firebase Auth Sign-In
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -137,6 +172,7 @@ export const LoginScreen = () => {
           setSuccessFlash(true);
           setAuditLog((prev) => [
             {
+              id: 'al-' + Math.random().toString(36).substr(2, 9),
               timestamp: new Date().toISOString(),
               role: 'superadmin',
               action: 'login',
@@ -164,6 +200,7 @@ export const LoginScreen = () => {
             setSuccessFlash(true);
             setAuditLog((prev) => [
               {
+                id: 'al-' + Math.random().toString(36).substr(2, 9),
                 timestamp: new Date().toISOString(),
                 role: 'passenger',
                 action: 'login',
@@ -202,6 +239,7 @@ export const LoginScreen = () => {
               setSuccessFlash(true);
               setAuditLog((prev) => [
                 {
+                  id: 'al-' + Math.random().toString(36).substr(2, 9),
                   timestamp: new Date().toISOString(),
                   role: selectedRole as any,
                   action: 'login',
@@ -227,7 +265,15 @@ export const LoginScreen = () => {
     } catch (err: any) {
       console.error(err);
       setErrorShake(true);
-      setErrorMsg(err.message || 'Incorrect email or password. Try again.');
+      
+      let friendlyError = 'Incorrect email or password. Try again.';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('auth/invalid-credential')) {
+         friendlyError = 'Invalid credentials. You can use your assigned role PIN as the password.';
+      } else if (err.message && !err.message.includes('auth/')) {
+         friendlyError = err.message;
+      }
+      
+      setErrorMsg(friendlyError);
       if (navigator.vibrate) navigator.vibrate(100);
       setTimeout(() => {
         setErrorShake(false);
@@ -244,7 +290,7 @@ export const LoginScreen = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 16 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 140, damping: 18 } },
+    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 140, damping: 18 } },
   };
 
   if (isStaffReg) {

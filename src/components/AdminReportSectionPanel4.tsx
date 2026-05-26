@@ -168,7 +168,7 @@ export const AdminReportSectionPanel4 = () => {
         const booking = ferryBookings.find(b => b.id === tx.bookingId);
         if (booking && booking.status === 'Confirmed') {
           setFerryBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Cancelled' } : b));
-          await updateBookingStatus('ferryBookings', booking.id, 'Cancelled');
+          await updateBookingStatus(booking.id, 'ferry', 'Cancelled');
           
           const ship = ships.find(s => s.id === booking.shipId);
           if (ship) {
@@ -181,7 +181,7 @@ export const AdminReportSectionPanel4 = () => {
         const booking = vanBookings.find(b => b.id === tx.bookingId);
         if (booking && booking.status === 'Confirmed') {
           setVanBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Cancelled' } : b));
-          await updateBookingStatus('vanBookings', booking.id, 'Cancelled');
+          await updateBookingStatus(booking.id, 'van', 'Cancelled');
 
           const trip = trips.find(t => t.id === booking.tripId);
           if (trip) {
@@ -218,7 +218,7 @@ export const AdminReportSectionPanel4 = () => {
     };
 
     setPayoutHistory(prev => [newPayout, ...prev]);
-    await persistPayout(newPayout);
+    await persistPayout(totalPaid, count);
     alert(`Successfully processed payout for ₱${totalPaid} across ${count} completion logs!`);
   };
 

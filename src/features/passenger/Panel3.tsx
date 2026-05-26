@@ -265,10 +265,10 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       shipId: voyageId,
       name: ferryName,
       contact: ferryContact,
-      type: ticketType,
-      status: isOnline ? 'Pending' : 'Queued',
+      type: ticketType as 'Regular' | 'Student' | 'Senior' | 'PWD',
+      status: (isOnline ? 'Pending' : 'Queued') as 'Pending' | 'Queued',
       bookingType: 'ferry',
-      accountId: userAccount?.id || null
+      accountId: userAccount?.id || ''
     };
 
     const updatedVoyage = { ...selVoyage, available: Math.max(0, selVoyage.available - 1) };
@@ -332,9 +332,9 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       name: shuttleName,
       contact: shuttleContact,
       seats: count,
-      status: isOnline ? 'Pending' : 'Queued',
+      status: (isOnline ? 'Pending' : 'Queued') as 'Pending' | 'Queued',
       bookingType: 'land',
-      accountId: userAccount?.id || null
+      accountId: userAccount?.id || ''
     };
 
     const updatedTrip = { ...selTrip, available: Math.max(0, selTrip.available - count) };
@@ -586,9 +586,9 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
                       ♂ Male
                     </button>
                     <button
-                      onClick={() => setVoiceProfile('robotic')}
+                      onClick={() => setVoiceProfile('robot')}
                       className={`py-1 rounded-lg border text-center transition-all ${
-                        voiceProfile === 'robotic'
+                        voiceProfile === 'robot'
                           ? 'bg-[#003087] text-white border-[#003087] font-black'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}

@@ -77,7 +77,7 @@ export interface AuditLog {
   id: string;
   timestamp: string;
   role: string;
-  action: 'login' | 'logout';
+  action: string;
 }
 
 export interface UserAccount {
@@ -96,12 +96,13 @@ export interface UserAccount {
 export interface AdminAccount {
   id: string;
   fullName: string;
-  mobileNumber: string;
-  role: 'port' | 'terminal' | 'driver';
+  mobileNumber?: string;
+  role: 'port' | 'terminal' | 'driver' | 'superadmin';
   workId?: string;           // port staff only
   terminalMemberId?: string; // terminal staff or driver
-  selfieUrl: string;
-  email: string;
+  selfieUrl?: string;
+  email?: string;
+  pin?: string;
   createdAt: string;
   lastLogin: string;
   status: 'active' | 'suspended' | 'pending';

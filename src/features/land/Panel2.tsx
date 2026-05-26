@@ -32,7 +32,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
   const [tripRoute, setTripRoute] = useState('Mamburao → Abra Port');
   const [depDateTime, setDepDateTime] = useState('');
   const [vehicleType, setVehicleType] = useState('Van');
-  const [driverName, setDriverName] = useState(userAccount?.accountType === 'driver' ? userAccount.fullName : '');
+  const [driverName, setDriverName] = useState('');
   const [capacity, setCapacity] = useState('14');
   const [searchPassenger, setSearchPassenger] = useState('');
   const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
@@ -63,11 +63,11 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
       id: 't-' + Math.random().toString(36).substr(2, 9),
       route: tripRoute,
       depTime: new Date(depDateTime).toISOString(),
-      type: vehicleType,
+      type: vehicleType as 'Van' | 'Bus',
       driver: driverName,
       capacity: Number(capacity),
       available: Number(capacity),
-      status: 'Scheduled'
+      status: 'Scheduled' as const
     };
 
     persistTrip(newTrip).catch(console.error);
@@ -77,7 +77,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const updateTripStatus = (tripId: string, status: string) => {
+  const localUpdateTripStatus = (tripId: string, status: 'Scheduled' | 'Boarding' | 'Departed' | 'Completed' | 'Cancelled') => {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status } : t));
     persistTripStatus(tripId, status).catch(console.error);
     setToastMessage(`🧭 Trip status updated to ${status}`);
@@ -86,7 +86,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
 
   const handleConfirmBooking = (booking: any) => {
     setVanBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Confirmed' } : b));
-    updateBookingStatus('vanBookings', booking.id, 'Confirmed').catch(console.error);
+    updateBookingStatus(booking.id, 'van', 'Confirmed').catch(console.error);
     addTransaction(booking, 'Terminal Admin');
     setToastMessage(`✅ Booking for ${booking.name} is successfully CONFIRMED!`);
     setTimeout(() => setToastMessage(null), 3500);
@@ -97,7 +97,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
     if (!booking) return;
 
     setVanBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    await updateBookingStatus('vanBookings', bookingId, 'Cancelled');
+    await updateBookingStatus(bookingId, 'van', 'Cancelled');
 
     // Restore capacity
     const trip = trips.find(t => t.id === booking.tripId);
@@ -252,7 +252,7 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                         <td className="py-3.5"><div className="font-extrabold">{t.driver}</div><span className="text-[9px] uppercase font-black text-slate-400">{t.type}</span></td>
                         <td className="py-3.5 font-bold text-slate-600">{t.route}</td>
                         <td className="py-3.5 text-center">
-                          <select value={t.status} onChange={e => updateTripStatus(t.id, e.target.value)} className="bg-slate-100 border rounded-xl text-[10px] font-black px-3 py-1">
+                          <select value={t.status} onChange={e => localUpdateTripStatus(t.id, e.target.value as any)} className="bg-slate-100 border rounded-xl text-[10px] font-black px-3 py-1">
                             {TRIP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </td>
@@ -332,8 +332,8 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                     <tr key={b.id} className="hover:bg-slate-50">
                       <td className="py-3">
                         <div className="flex items-center gap-3">
-                          {(acc?.selfieDataUrl || (acc as any)?.selfieUrl) && (
-                            <img src={acc?.selfieDataUrl || (acc as any)?.selfieUrl} className="w-8 h-8 rounded-full border object-cover" alt="S" referrerPolicy="no-referrer" />
+                          {acc?.selfieUrl && (
+                            <img src={acc?.selfieUrl} className="w-8 h-8 rounded-full border object-cover" alt="S" referrerPolicy="no-referrer" />
                           )}
                           <div>
                             <div className="font-bold flex items-center gap-1.5">

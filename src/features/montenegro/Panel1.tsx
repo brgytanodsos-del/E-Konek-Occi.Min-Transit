@@ -4,6 +4,7 @@ import { WeatherWidget } from '../../components/WeatherWidget';
 import { motion, AnimatePresence } from 'motion/react';
 import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
 import { QRCodeScanner } from '../../components/common/QRCodeScanner';
+import { toast } from 'sonner';
 
 interface Panel1Props {
   isSuperAdmin: boolean;
@@ -68,7 +69,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
 
   // Stats
   const ticketsSoldToday = ferryBookings.filter(b => b.status === 'Confirmed').length;
-  const boardedCount = ferryBookings.filter(b => b.status === 'Boarded').length; 
+  const boardedCount = auditLog.filter(log => log.role === 'port' && log.action.startsWith('QR_SCAN_VALIDATION_')).length; 
   const upcomingDepartures = ships.filter(s => s.status === 'Scheduled' || s.status === 'Boarding').length;
   const totalSlots = ships.reduce((acc, s) => acc + s.available, 0);
 
@@ -83,18 +84,20 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
         const booking = ferryBookings.find(b => b.id === decodedText);
         if (!booking) {
           setScanState('error');
+          setAuditLog(prev => [...prev, { id: 'al-' + Math.random().toString(36).substr(2, 9), timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_FAILED_INVALID` }]);
           toast.error('Invalid ticket ref: ' + decodedText);
           setTimeout(() => setScanState('idle'), 2000);
           return;
         }
         if (booking.status === 'Confirmed') {
-          setScanState('success');
+          setScanState('success'); // Or maybe error/warning depending on requirements
+          setAuditLog(prev => [...prev, { id: 'al-' + Math.random().toString(36).substr(2, 9), timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_FAILED_ALREADY_CONFIRMED` }]);
           toast.success('Ticket already confirmed.');
           setTimeout(() => { setScanState('idle'); setShowScanner(false); }, 1500);
           return;
         }
         setScanState('success');
-        setAuditLog(prev => [...prev, { timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_VALIDATION_${booking.id}` }]);
+        setAuditLog(prev => [...prev, { id: 'al-' + Math.random().toString(36).substr(2, 9), timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_VALIDATION_${booking.id}` }]);
         handleConfirmBooking(booking);
         setTimeout(() => { setScanState('idle'); setShowScanner(false); }, 1500);
     }, 1000);
@@ -114,10 +117,10 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
       route,
       depTime: new Date(depDateTime).toISOString(),
       arrTime: new Date(arrDateTime).toISOString(),
-      status: 'Scheduled',
+      status: 'Scheduled' as const,
       capacity: Number(capacity),
       available: Number(capacity),
-      type: vesselType,
+      type: vesselType as 'RORO' | 'Passenger Ferry',
     };
 
     persistShip(newShipObj).catch(console.error);
@@ -129,7 +132,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const updateShipStatus = (shipId: string, status: string) => {
+  const localUpdateShipStatus = (shipId: string, status: 'Scheduled' | 'Boarding' | 'Departed' | 'Delayed' | 'Cancelled') => {
     setShips(prev => prev.map(s => s.id === shipId ? { ...s, status } : s));
     persistShipStatus(shipId, status).catch(console.error);
   };
@@ -152,7 +155,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
 
   const handleConfirmBooking = (booking: any) => {
     setFerryBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Confirmed' } : b));
-    updateBookingStatus('ferryBookings', booking.id, 'Confirmed').catch(console.error);
+    updateBookingStatus(booking.id, 'ferry', 'Confirmed').catch(console.error);
     addTransaction(booking, 'Port Admin');
     setToastMessage(`✅ Booking for ${booking.name} is successfully CONFIRMED!`);
     setTimeout(() => setToastMessage(null), 4000);
@@ -163,7 +166,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
     if (!booking) return;
 
     setFerryBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    await updateBookingStatus('ferryBookings', bookingId, 'Cancelled');
+    await updateBookingStatus(bookingId, 'ferry', 'Cancelled');
 
     // Restore capacity 
     const ship = ships.find(s => s.id === booking.shipId);
@@ -290,7 +293,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                       </div>
                     </td>
                     <td className="py-4">
-                      <select value={s.status} onChange={(e) => updateShipStatus(s.id, e.target.value)}
+                      <select value={s.status} onChange={(e) => localUpdateShipStatus(s.id, e.target.value as any)}
                         className="bg-slate-150 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-black px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#009E49] transition-all cursor-pointer shadow-sm">
                         {SHIP_STATUSES.map(stat => <option key={stat} value={stat}>{stat}</option>)}
                       </select>
@@ -423,9 +426,9 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                         <td className="py-4 font-mono font-black text-xs text-slate-500">#{b.id.toUpperCase()}</td>
                         <td className="py-4">
                           <div className="flex items-center gap-3">
-                            {(acc?.selfieDataUrl || (acc as any)?.selfieUrl) && (
+                            {acc?.selfieUrl && (
                               <img 
-                                src={acc?.selfieDataUrl || (acc as any)?.selfieUrl} 
+                                src={acc?.selfieUrl} 
                                 className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-sm ring-2 ring-emerald-500/20" 
                                 alt="Selfie"
                                 referrerPolicy="no-referrer"

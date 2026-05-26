@@ -155,7 +155,13 @@ export const StaffAccountRegistration: React.FC<StaffAccountRegistrationProps> =
       onComplete();
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Failed to submit staff application. Please try again.');
+      let errMsg = err.message || 'Failed to submit staff application. Please try again.';
+      if (errMsg.includes('auth/')) {
+         if (err.code === 'auth/email-already-in-use') errMsg = 'This email is already registered. Please sign in instead.';
+         else if (err.code === 'auth/weak-password') errMsg = 'Password is too weak. Please use a stronger password.';
+         else errMsg = 'Failed to submit application. Please check your details.';
+      }
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }

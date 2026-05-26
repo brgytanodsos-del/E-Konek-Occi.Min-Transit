@@ -7,8 +7,15 @@ import { App } from './App';
 import './index.css';
 
 import { validateEnvironment } from './lib/env';
+import { Workbox } from 'workbox-window';
 
 validateEnvironment();
+
+if ('serviceWorker' in navigator) {
+  const wb = new Workbox('/sw.js');
+  wb.addEventListener('activated', () => console.log('✅ E-Konek Service Worker activated'));
+  wb.register().catch(err => console.error('SW registration failed:', err));
+}
 
 const container = document.getElementById('root');
 if (container) {

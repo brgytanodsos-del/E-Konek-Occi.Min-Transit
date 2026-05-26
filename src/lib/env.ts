@@ -6,7 +6,7 @@ const required = [
 ] as const;
 
 export const validateEnvironment = () => {
-  const missing = required.filter(key => !import.meta.env[key]);
+  const missing = required.filter(key => !(import.meta as any).env?.[key]);
 
   if (missing.length > 0) {
     const message = `❌ Missing environment variables:\n${missing.join('\n')}\n\nPlease check your .env file.`;

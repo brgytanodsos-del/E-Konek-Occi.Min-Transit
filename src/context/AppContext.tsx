@@ -49,6 +49,8 @@ import { getMockSeed } from '../utils/mockData';
 import { GPS_ROUTES } from './GPS_ROUTES';
 import { calculateCommission, FARE_CONFIG, FerryTicketType } from '../utils/businessLogic';
 
+import { offlineQueue as newOfflineQueue } from '../lib/offlineQueue';
+
 // ---------------------------------------------------------------------------
 // ID generation — crypto.randomUUID() where available, with graceful fallback
 // ---------------------------------------------------------------------------
@@ -278,49 +280,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Offline queue sync
+  // Sync queue to localStorage whenever it changes
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!isOnline || offlineQueue.length === 0) return;
-
-    const runSync = async () => {
-      const count = offlineQueue.length;
-      const currentFerry = [...ferryBookings];
-      const currentVan = [...vanBookings];
-
-      for (const item of offlineQueue) {
-        try {
-          if ((item as any).queueType === 'ferryBooking') {
-            const cleaned = { ...(item as any) };
-            delete cleaned.queueType;
-            cleaned.status = 'Pending';
-            await setDoc(doc(db, 'ferryBookings', cleaned.id), cleaned);
-            const idx = currentFerry.findIndex((b) => b.id === cleaned.id);
-            if (idx !== -1) currentFerry[idx].status = 'Pending';
-            else currentFerry.push(cleaned);
-          } else if ((item as any).queueType === 'vanBooking') {
-            const cleaned = { ...(item as any) };
-            delete cleaned.queueType;
-            cleaned.status = 'Pending';
-            await setDoc(doc(db, 'vanBookings', cleaned.id), cleaned);
-            const idx = currentVan.findIndex((b) => b.id === cleaned.id);
-            if (idx !== -1) currentVan[idx].status = 'Pending';
-            else currentVan.push(cleaned);
-          }
-        } catch (err) {
-          console.error('Failed to sync queue item:', err);
-        }
-      }
-
-      setFerryBookings(currentFerry);
-      setVanBookings(currentVan);
-      setOfflineQueue([]);
-      clearQueueFromStorage();
-      toast.success(`✅ ${count} offline booking(s) synced!`);
-    };
-
-    runSync();
-  }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
+    saveQueueToStorage(offlineQueue);
+  }, [offlineQueue]);
 
   // ---------------------------------------------------------------------------
   // GPS simulation
@@ -472,9 +436,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const persistFerryBooking = async (booking: FerryBooking) => {
     if (!isOnline) {
-      const qItem = { ...booking, status: 'Queued' as const, queueType: 'ferryBooking' };
-      setOfflineQueue((prev) => [...prev, qItem as any]);
+      const qItem = { ...booking, status: 'Queued' as const, queueType: 'ferryBooking' as const };
       setFerryBookings((prev) => prev.some((b) => b.id === qItem.id) ? prev : [qItem, ...prev]);
+      
+      await newOfflineQueue.add({
+        type: 'booking',
+        collection: 'ferryBookings',
+        docId: booking.id,
+        payload: { ...booking, status: 'Pending' },
+        userId: userAccount?.id || currentRole || 'unknown',
+        role: currentRole || 'unknown',
+      });
+      
       toast('📥 Booking queued — will sync when back online', { icon: '📥' });
       return;
     }
@@ -486,9 +459,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const persistVanBooking = async (booking: VanBooking) => {
     if (!isOnline) {
-      const qItem = { ...booking, status: 'Queued' as const, queueType: 'vanBooking' };
-      setOfflineQueue((prev) => [...prev, qItem as any]);
+      const qItem = { ...booking, status: 'Queued' as const, queueType: 'vanBooking' as const };
       setVanBookings((prev) => prev.some((b) => b.id === qItem.id) ? prev : [qItem, ...prev]);
+      
+      await newOfflineQueue.add({
+        type: 'booking',
+        collection: 'vanBookings',
+        docId: booking.id,
+        payload: { ...booking, status: 'Pending' },
+        userId: userAccount?.id || currentRole || 'unknown',
+        role: currentRole || 'unknown',
+      });
+
       toast('📥 Booking queued — will sync when back online', { icon: '📥' });
       return;
     }

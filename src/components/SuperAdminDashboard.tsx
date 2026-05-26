@@ -98,6 +98,7 @@ export const SuperAdminDashboard = () => {
   const handleLogoutAction = () => {
     // Record audit logout log
     setAuditLog(prev => [{
+      id: 'al-' + Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toISOString(),
       role: currentRole as any,
       action: 'logout'

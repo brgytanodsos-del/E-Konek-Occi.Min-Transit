@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { toast } from 'sonner';
 import { useApp } from '../../context/AppContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface QRCodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -41,6 +42,45 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     .filter((entry) => entry.role === 'port' && entry.action.startsWith('QR_SCAN_VALIDATION_'))
     .slice(-5)
     .reverse();
+
+  const chartData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    // 6 intervals of 4 hours
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 4 * 60 * 60 * 1000);
+      data.push({
+        intervalStart: new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()),
+        label: `${d.getHours()}:00`,
+        success: 0,
+        failed: 0,
+      });
+    }
+
+    const start = data[0].intervalStart.getTime();
+
+    auditLog.forEach(log => {
+      if (log.role !== 'port') return;
+      if (!log.action.startsWith('QR_SCAN_VALIDATION_') && !log.action.startsWith('QR_SCAN_FAILED_')) return;
+      
+      const t = new Date(log.timestamp).getTime();
+      if (t >= start) {
+         let bucketIdx = 5;
+         for (let i = 0; i < 5; i++) {
+            if (t >= data[i].intervalStart.getTime() && t < data[i + 1].intervalStart.getTime()) {
+              bucketIdx = i;
+              break;
+            }
+         }
+         if (log.action.startsWith('QR_SCAN_VALIDATION_')) {
+           data[bucketIdx].success++;
+         } else {
+           data[bucketIdx].failed++;
+         }
+      }
+    });
+    return data;
+  }, [auditLog]);
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
@@ -88,16 +128,41 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         {/* Validation History Table */}
         <div className="mt-4 border-t pt-2 max-h-40 overflow-y-auto">
           <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Recent Validations</h4>
-          <table className="w-full text-xs">
-            <tbody className="divide-y text-slate-700">
-              {qrValidations.map((log, i) => (
-                <tr key={i}>
-                  <td className="py-1.5 font-mono">{log.action.replace('QR_SCAN_VALIDATION_', '')}</td>
-                  <td className="py-1.5 text-right">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {qrValidations.length === 0 ? (
+            <p className="text-slate-400 text-xs text-center py-2">No recent scans</p>
+          ) : (
+            <table className="w-full text-xs">
+              <tbody className="divide-y text-slate-700">
+                {qrValidations.map((log, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 font-mono">{log.action.replace('QR_SCAN_VALIDATION_', '')}</td>
+                    <td className="py-1.5 text-right">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* 24h Validation Chart */}
+        <div className="mt-4 border-t pt-4">
+          <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Last 24 Hours</h4>
+          <div className="h-40 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="label" fontSize={10} axisLine={false} tickLine={false} tickMargin={8} />
+                <YAxis allowDecimals={false} fontSize={10} axisLine={false} tickLine={false} />
+                <Tooltip 
+                   contentStyle={{ fontSize: '11px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                   cursor={{ fill: '#f1f5f9' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                <Bar dataKey="success" name="Success" fill="#10b981" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="failed" name="Failed" fill="#ef4444" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <button
