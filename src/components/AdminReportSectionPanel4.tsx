@@ -29,10 +29,6 @@ export const AdminReportSectionPanel4 = () => {
 
   // Admin Account Generation Drawer
   const [isAdminDrawerOpen, setIsAdminDrawerOpen] = useState(false);
-  const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminRole, setNewAdminRole] = useState<'port' | 'terminal'>('port');
-  const [newAdminPin, setNewAdminPin] = useState('');
-  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
  
   const handleApproveAdmin = async (id: string, fullName: string, role: string) => {
     try {
@@ -64,35 +60,6 @@ export const AdminReportSectionPanel4 = () => {
     } catch (err) {
       console.error(err);
       alert("Failed to reject application");
-    }
-  };
-
-  const handleCreateAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAdminName || !newAdminPin) return alert("Please fill all fields");
-    if (newAdminPin.length !== 4) return alert("PIN must be exactly 4 digits");
-
-    setIsCreatingAdmin(true);
-    try {
-      const { fsSet } = await import('../lib/firebase');
-      const newAdmin = {
-        id: 'adm-' + Math.random().toString(36).substr(2, 9),
-        fullName: newAdminName,
-        role: newAdminRole,
-        pin: newAdminPin,
-        createdAt: new Date().toISOString(),
-        status: 'active'
-      };
-      await fsSet('adminAccounts', newAdmin.id, newAdmin);
-      setNewAdminName('');
-      setNewAdminPin('');
-      setIsAdminDrawerOpen(false);
-      alert("Staff Admin account generated successfully!");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to create admin account");
-    } finally {
-      setIsCreatingAdmin(false);
     }
   };
 
@@ -348,55 +315,6 @@ export const AdminReportSectionPanel4 = () => {
                   </div>
                 )}
 
-                <form onSubmit={handleCreateAdmin} className="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-2">Issue New Access</h4>
-                  
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Staff Full Name</label>
-                    <input
-                      required
-                      type="text"
-                      value={newAdminName}
-                      onChange={e => setNewAdminName(e.target.value)}
-                      placeholder="e.g. Juan De La Cruz"
-                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Station</label>
-                    <select
-                      value={newAdminRole}
-                      onChange={e => setNewAdminRole(e.target.value as 'port' | 'terminal')}
-                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="port">🚢 Abra Port Staff</option>
-                      <option value="terminal">🚐 Mamburao Terminal Staff</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Set 4-Digit PIN</label>
-                    <input
-                      required
-                      type="password"
-                      maxLength={4}
-                      pattern="\d{4}"
-                      value={newAdminPin}
-                      onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, ''))}
-                      placeholder="••••"
-                      className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-
-                  <button
-                    disabled={isCreatingAdmin}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl shadow-lg transition disabled:opacity-50"
-                  >
-                    {isCreatingAdmin ? 'Processing...' : 'Authorize Staff Account'}
-                  </button>
-                </form>
-
                 <div className="space-y-3">
                   <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
                     <i className="fa-solid fa-users-gear text-xs"></i> Authorized Personnel ({adminAccounts.filter(a => a.status === 'active').length})
@@ -415,7 +333,7 @@ export const AdminReportSectionPanel4 = () => {
                               <p className="text-xs font-black text-gray-800 leading-tight">{adm.fullName}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-tighter">
-                                  {adm.role === 'port' ? '🚢 Port' : '🚐 Terminal'}
+                                  {adm.role === 'port' ? '🚢 Port' : adm.role === 'driver' ? '🚐 Driver' : '🚐 Terminal'}
                                 </p>
                                 <span className="text-[8px] text-gray-300">•</span>
                                 <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">ID: {adm.id}</span>
@@ -424,7 +342,6 @@ export const AdminReportSectionPanel4 = () => {
                           </div>
                           <div className="text-right">
                              <div className="flex flex-col items-end">
-                               <span className="text-[9px] font-mono font-bold text-gray-300 block mb-1">PIN: ****</span>
                                <button 
                                  onClick={() => handleRejectAdmin(adm.id, adm.fullName)}
                                  className="opacity-0 group-hover:opacity-100 text-[8px] text-rose-500 font-black uppercase hover:underline transition-opacity"

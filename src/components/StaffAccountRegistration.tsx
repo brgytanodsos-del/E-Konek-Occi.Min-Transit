@@ -125,9 +125,8 @@ export const StaffAccountRegistration: React.FC<StaffAccountRegistrationProps> =
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
-      // 2. Upload selfie to Firebase Storage under dynamic generatedId
-      const generatedId = Math.random().toString(36).substring(2, 11);
-      const selfieRef = ref(storage, `selfies/staff/${generatedId}.jpg`);
+      // 2. Upload selfie to Firebase Storage under uid
+      const selfieRef = ref(storage, `selfies/staff/${uid}.jpg`);
       await uploadBytes(selfieRef, selfieFile);
       const selfieUrl = await getDownloadURL(selfieRef);
 

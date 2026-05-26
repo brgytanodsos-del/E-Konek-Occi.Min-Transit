@@ -43,6 +43,14 @@ const roleOptions = [
     accent: 'amber' as const,
   },
   {
+    value: 'driver',
+    label: 'Shuttle Driver',
+    shortLabel: 'Driver Portal',
+    desc: 'View assigned land shuttle trips, manage passenger count, and update dispatch status.',
+    icon: Bus,
+    accent: 'amber' as const,
+  },
+  {
     value: 'passenger',
     label: 'Passenger',
     shortLabel: 'Public portal',
@@ -53,7 +61,7 @@ const roleOptions = [
   {
     value: 'superadmin',
     label: 'Super admin',
-    shortLabel: 'Operations control',
+    shortLabel: 'Operations admin',
     desc: 'Oversee stations, staff access, reports, payouts, and network-wide operations.',
     icon: ShieldCheck,
     accent: 'navy' as const,
@@ -83,8 +91,6 @@ const roleAccentStyles = {
 
 export const LoginScreen = () => {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'pin' | 'email'>('pin');
-  const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -174,7 +180,7 @@ export const LoginScreen = () => {
                 action: 'login',
               },
               ...prev,
-            ]);
+                ]);
 
             setTimeout(() => {
               setCurrentRole('passenger');
@@ -188,7 +194,7 @@ export const LoginScreen = () => {
           throw new Error('Passenger record not found in system storage.');
         }
       } else {
-        // Port or Terminal Staff Login
+        // Port, Terminal or Driver Staff Login
         const staffDocRef = doc(db, 'adminAccounts', user.uid);
         const staffDocSnap = await getDoc(staffDocRef);
 
@@ -196,11 +202,12 @@ export const LoginScreen = () => {
           const staffData = staffDocSnap.data();
           // Check role alignment
           const roleMatches = (selectedRole === 'port' && staffData.role === 'port') ||
-                              (selectedRole === 'terminal' && (staffData.role === 'terminal' || staffData.role === 'driver'));
+                              (selectedRole === 'terminal' && staffData.role === 'terminal') ||
+                              (selectedRole === 'driver' && staffData.role === 'driver');
 
           if (roleMatches) {
             if (staffData.status === 'pending') {
-              throw new Error('Your account is still pending Super Admin approval.');
+              throw new Error('Your account is still pending Super Admin approval. Application has been submitted.');
             } else if (staffData.status === 'suspended') {
               throw new Error('Your account has been suspended. Contact the administrator.');
             } else if (staffData.status === 'active') {
@@ -224,7 +231,7 @@ export const LoginScreen = () => {
               throw new Error('Internal account error: status is invalid.');
             }
           } else {
-            throw new Error(`This account cannot log in as a ${selectedRole === 'port' ? 'Port Ticketing Agent' : 'Terminal Operator'}.`);
+            throw new Error(`This account cannot log in as ${selectedRole === 'port' ? 'Port Staff' : selectedRole === 'driver' ? 'Driver' : 'Terminal Staff'}. Standard role is ${staffData.role === 'port' ? 'Port Staff' : staffData.role === 'driver' ? 'Driver' : 'Terminal Staff'}.`);
           }
         } else {
           throw new Error('No staff credentials match this email address.');
@@ -561,7 +568,7 @@ export const LoginScreen = () => {
                         Don’t have a passenger account? Register here
                       </button>
                     )}
-                    {(selectedRole === 'port' || selectedRole === 'terminal') && (
+                    {(selectedRole === 'port' || selectedRole === 'terminal' || selectedRole === 'driver') && (
                       <button
                         onClick={() => setIsStaffReg(true)}
                         className="text-amber-600 hover:text-amber-700 font-bold underline"

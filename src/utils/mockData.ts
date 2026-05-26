@@ -1,13 +1,7 @@
 /**
- * mockData.ts — FIXED
+ * mockData.ts
  *
- * Changes vs original:
- * 1. adminAccounts no longer contain plaintext PINs.
- *    The `pin` field now holds the string "HASH_REQUIRED" as a sentinel.
- *    Before using the app with real users, run the `/api/auth/hash-pin`
- *    utility endpoint (protected by X-Setup-Secret) to generate proper
- *    scrypt hashes and store them in Firestore.
- * 2. All other seed data is unchanged.
+ * Seeding schema for e-transit data models.
  */
 
 import {
@@ -235,18 +229,11 @@ export const getMockSeed = (name: string): any[] => {
       ] as AuditLog[];
 
     case 'adminAccounts':
-      // ⚠️  PIN field must contain a scrypt hash, NOT a plaintext PIN.
-      // Use the /api/auth/hash-pin endpoint (protected by X-Setup-Secret) to
-      // generate hashes for your real PINs, then store them in Firestore.
-      // The "HASH_REQUIRED" sentinel below will cause auth to fail until you
-      // replace it — this is intentional to prevent accidental deployment with
-      // insecure credentials.
       return [
         {
           id: 'adm-port',
           fullName: 'Abra Ticketing Lead',
           role: 'port',
-          pin: 'HASH_REQUIRED', // Replace with: scrypt:<salt>:<hash>
           createdAt: now.toISOString(),
           lastLogin: '',
           status: 'active',
@@ -255,7 +242,6 @@ export const getMockSeed = (name: string): any[] => {
           id: 'adm-terminal',
           fullName: 'Mamburao Dispatcher',
           role: 'terminal',
-          pin: 'HASH_REQUIRED', // Replace with: scrypt:<salt>:<hash>
           createdAt: now.toISOString(),
           lastLogin: '',
           status: 'active',
@@ -264,7 +250,6 @@ export const getMockSeed = (name: string): any[] => {
           id: 'adm-superadmin',
           fullName: 'Operations Supervisor',
           role: 'superadmin',
-          pin: 'HASH_REQUIRED', // Replace with: scrypt:<salt>:<hash>
           createdAt: now.toISOString(),
           lastLogin: '',
           status: 'active',

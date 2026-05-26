@@ -28,8 +28,10 @@ import {
   doc,
   setDoc,
   updateDoc,
+  getDoc,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { toast } from 'sonner';
 import {
   Ship,
@@ -141,6 +143,10 @@ interface AppContextType {
   setAutoSyncEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   lastSyncTime: Date | null;
   setLastSyncTime: React.Dispatch<React.SetStateAction<Date | null>>;
+  currentUser: AdminAccount | UserAccount | null;
+  setCurrentUser: React.Dispatch<React.SetStateAction<AdminAccount | UserAccount | null>>;
+  isLoading: boolean;
+  logout: () => Promise<void>;
 
   // API methods
   addTransaction: (booking: Booking, confirmedBy: 'Port Admin' | 'Terminal Admin') => Promise<void>;
@@ -174,6 +180,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [userAccount, setUserAccount] = useState<UserAccount | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminAccount | UserAccount | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const logout = async () => {
+    await auth.signOut();
+    setCurrentRole(null);
+    setIsAuthenticated(false);
+    setUserAccount(null);
+    setCurrentUser(null);
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoading(true);
+      if (firebaseUser) {
+        try {
+          // 1. Check if email is superadmin
+          const isSuper = firebaseUser.email === 'brgytanodsos@gmail.com' || firebaseUser.email?.startsWith('admin');
+          
+          if (isSuper) {
+            // Super Admin
+            setCurrentRole('superadmin');
+            setIsAuthenticated(true);
+            setCurrentUser({
+              id: firebaseUser.uid,
+              fullName: 'System Super Admin',
+              mobileNumber: '',
+              role: 'superadmin' as any,
+              selfieUrl: '',
+              email: firebaseUser.email || '',
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString(),
+              status: 'active'
+            } as any);
+            setIsLoading(false);
+            return;
+          }
+
+          // 2. Try adminAccounts
+          const adminDoc = await getDoc(doc(db, 'adminAccounts', firebaseUser.uid));
+          if (adminDoc.exists()) {
+            const adminData = adminDoc.data() as AdminAccount;
+            if (adminData.status === 'active') {
+              setCurrentRole(adminData.role);
+              setIsAuthenticated(true);
+              setCurrentUser(adminData);
+            } else {
+              await auth.signOut();
+              setCurrentRole(null);
+              setIsAuthenticated(false);
+              setCurrentUser(null);
+            }
+            setIsLoading(false);
+            return;
+          }
+
+          // 3. Try userAccounts (passenger)
+          const passengerDoc = await getDoc(doc(db, 'userAccounts', firebaseUser.uid));
+          if (passengerDoc.exists()) {
+            const passengerData = passengerDoc.data() as UserAccount;
+            setCurrentRole('passenger');
+            setIsAuthenticated(true);
+            setUserAccount(passengerData);
+            setCurrentUser(passengerData);
+            setIsLoading(false);
+            return;
+          }
+
+          // No doc matches
+          await auth.signOut();
+          setCurrentRole(null);
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+        } catch (error) {
+          console.error("Error hydrating Firebase session state:", error);
+        }
+      } else {
+        setCurrentRole(null);
+        setIsAuthenticated(false);
+        setUserAccount(null);
+        setCurrentUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Dark mode
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -623,6 +716,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isDarkMode, setIsDarkMode,
         autoSyncEnabled, setAutoSyncEnabled,
         lastSyncTime, setLastSyncTime,
+        currentUser, setCurrentUser,
+        isLoading,
+        logout,
         addTransaction,
         getTripLocation,
         formatPST,

@@ -6,14 +6,7 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { LoginScreen } from './components/LoginScreen'; 
 import { useSyncStore } from './context/syncStore';
 import { SyncStatus } from './components/SyncStatus';
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useApp();
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-  return <>{children}</>;
-};
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const App = () => {
   const { setOnline, refreshPending } = useSyncStore();
