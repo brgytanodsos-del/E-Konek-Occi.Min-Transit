@@ -7,6 +7,7 @@ import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Ship, Trip } from '../types/dataTypes';
 import { toast } from 'sonner';
+import { calculateDynamicPrice } from '../lib/pricingEngine';
 
 export const TripManagement: React.FC = () => {
   const {
@@ -20,7 +21,10 @@ export const TripManagement: React.FC = () => {
     formatPST
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'sea' | 'land'>('sea');
+  const { currentUser, currentRole } = useApp();
+  const isSuperAdmin = currentRole === 'superadmin';
+  const canEditPrices = isSuperAdmin || ['port', 'terminal', 'driver'].includes(currentRole || '');
+  const [activeTab, setActiveTab] = useState<'sea' | 'land'>(currentRole === 'terminal' || currentRole === 'driver' ? 'land' : 'sea');
   const [showShipModal, setShowShipModal] = useState(false);
   const [showTripModal, setShowTripModal] = useState(false);
   const [editingShip, setEditingShip] = useState<Ship | null>(null);
@@ -35,7 +39,12 @@ export const TripManagement: React.FC = () => {
     status: 'Scheduled' as Ship['status'],
     capacity: 250,
     available: 250,
-    type: 'RORO' as Ship['type']
+    type: 'RORO' as Ship['type'],
+    basePrice: 500,
+    currentPrice: 500,
+    priceMultiplier: 1,
+    priceAdjustmentReason: '',
+    pricingMode: 'manual' as 'manual' | 'automatic'
   });
 
   // Land trip form state
@@ -46,7 +55,12 @@ export const TripManagement: React.FC = () => {
     driver: '',
     capacity: 15,
     available: 15,
-    status: 'Scheduled' as Trip['status']
+    status: 'Scheduled' as Trip['status'],
+    basePrice: 200,
+    currentPrice: 200,
+    priceMultiplier: 1,
+    priceAdjustmentReason: '',
+    pricingMode: 'manual' as 'manual' | 'automatic'
   });
 
   // Helper to pre-populate sea form
@@ -61,7 +75,12 @@ export const TripManagement: React.FC = () => {
         status: ship.status,
         capacity: ship.capacity,
         available: ship.available,
-        type: ship.type
+        type: ship.type,
+        basePrice: ship.basePrice || 500,
+        currentPrice: ship.currentPrice || 500,
+        priceMultiplier: ship.priceMultiplier || 1,
+        priceAdjustmentReason: ship.priceAdjustmentReason || '',
+        pricingMode: ship.pricingMode || 'manual'
       });
     } else {
       setEditingShip(null);
@@ -73,7 +92,12 @@ export const TripManagement: React.FC = () => {
         status: 'Scheduled',
         capacity: 250,
         available: 250,
-        type: 'RORO'
+        type: 'RORO',
+        basePrice: 500,
+        currentPrice: 500,
+        priceMultiplier: 1,
+        priceAdjustmentReason: '',
+        pricingMode: 'manual'
       });
     }
     setShowShipModal(true);
@@ -95,7 +119,12 @@ export const TripManagement: React.FC = () => {
         driver: trip.driver,
         capacity: trip.capacity,
         available: trip.available,
-        status: trip.status
+        status: trip.status,
+        basePrice: trip.basePrice || 200,
+        currentPrice: trip.currentPrice || 200,
+        priceMultiplier: trip.priceMultiplier || 1,
+        priceAdjustmentReason: trip.priceAdjustmentReason || '',
+        pricingMode: trip.pricingMode || 'manual'
       });
     } else {
       setEditingTrip(null);
@@ -106,7 +135,12 @@ export const TripManagement: React.FC = () => {
         driver: '',
         capacity: 15,
         available: 15,
-        status: 'Scheduled'
+        status: 'Scheduled',
+        basePrice: 200,
+        currentPrice: 200,
+        priceMultiplier: 1,
+        priceAdjustmentReason: '',
+        pricingMode: 'manual'
       });
     }
     setShowTripModal(true);
@@ -117,6 +151,11 @@ export const TripManagement: React.FC = () => {
     e.preventDefault();
     try {
       const shipId = editingShip ? editingShip.id : 'ship-' + Math.random().toString(36).substr(2, 9);
+      
+      const isPriceChanged = editingShip && 
+        (editingShip.currentPrice !== shipForm.currentPrice || 
+         editingShip.priceAdjustmentReason !== shipForm.priceAdjustmentReason);
+
       const payload: Ship = {
         id: shipId,
         name: shipForm.name,
@@ -126,10 +165,36 @@ export const TripManagement: React.FC = () => {
         status: shipForm.status,
         capacity: Number(shipForm.capacity),
         available: editingShip ? Number(shipForm.available) : Number(shipForm.capacity),
-        type: shipForm.type
+        type: shipForm.type,
+        basePrice: Number(shipForm.basePrice),
+        currentPrice: Number(shipForm.currentPrice),
+        priceMultiplier: Number(shipForm.priceMultiplier),
+        priceAdjustmentReason: shipForm.priceAdjustmentReason,
+        pricingMode: shipForm.pricingMode,
+        autoRules: shipForm.pricingMode === 'automatic' ? shipForm.autoRules : undefined,
+        lastPriceUpdatedBy: currentUser?.fullName || 'Admin',
+        lastPriceUpdatedAt: new Date().toISOString()
       };
 
       await persistShip(payload);
+
+      if (isPriceChanged && isOnline) {
+        // Log price history in sub-collection
+        try {
+          const { collection, addDoc } = require('firebase/firestore');
+          await addDoc(collection(db, `ships/${shipId}/priceHistory`), {
+            previousPrice: editingShip.currentPrice || editingShip.basePrice || 500,
+            newPrice: payload.currentPrice,
+            multiplier: payload.priceMultiplier,
+            reason: payload.priceAdjustmentReason,
+            changedBy: currentUser?.fullName || 'Admin',
+            changedAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.error("Failed to log ship price history:", e);
+        }
+      }
+
       toast.success(editingShip ? '🌊 Voyage details updated!' : '🚢 New voyage scheduled successfully!');
       setShowShipModal(false);
       setEditingShip(null);
@@ -143,6 +208,11 @@ export const TripManagement: React.FC = () => {
     e.preventDefault();
     try {
       const tripId = editingTrip ? editingTrip.id : 'trip-' + Math.random().toString(36).substr(2, 9);
+      
+      const isPriceChanged = editingTrip && 
+        (editingTrip.currentPrice !== tripForm.currentPrice || 
+         editingTrip.priceAdjustmentReason !== tripForm.priceAdjustmentReason);
+
       const payload: Trip = {
         id: tripId,
         route: tripForm.route,
@@ -151,10 +221,36 @@ export const TripManagement: React.FC = () => {
         driver: tripForm.driver,
         capacity: Number(tripForm.capacity),
         available: editingTrip ? Number(tripForm.available) : Number(tripForm.capacity),
-        status: tripForm.status
+        status: tripForm.status,
+        basePrice: Number(tripForm.basePrice),
+        currentPrice: Number(tripForm.currentPrice),
+        priceMultiplier: Number(tripForm.priceMultiplier),
+        priceAdjustmentReason: tripForm.priceAdjustmentReason,
+        pricingMode: tripForm.pricingMode,
+        autoRules: tripForm.pricingMode === 'automatic' ? tripForm.autoRules : undefined,
+        lastPriceUpdatedBy: currentUser?.fullName || 'Admin',
+        lastPriceUpdatedAt: new Date().toISOString()
       };
 
       await persistTrip(payload);
+
+      if (isPriceChanged && isOnline) {
+        // Log price history in sub-collection
+        try {
+          const { collection, addDoc } = require('firebase/firestore');
+          await addDoc(collection(db, `trips/${tripId}/priceHistory`), {
+            previousPrice: editingTrip.currentPrice || editingTrip.basePrice || 200,
+            newPrice: payload.currentPrice,
+            multiplier: payload.priceMultiplier,
+            reason: payload.priceAdjustmentReason,
+            changedBy: currentUser?.fullName || 'Admin',
+            changedAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.error("Failed to log trip price history:", e);
+        }
+      }
+
       toast.success(editingTrip ? '🚐 Dispatch schedule updated!' : '🚐 New shuttle dispatched successfully!');
       setShowTripModal(false);
       setEditingTrip(null);
@@ -194,28 +290,30 @@ export const TripManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Tab Switcher */}
-      <div className="flex bg-slate-900/60 p-1 rounded-2xl border border-slate-800 self-start max-w-sm">
-        <button
-          onClick={() => setActiveTab('sea')}
-          className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
-            activeTab === 'sea'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 bg-transparent'
-          }`}
-        >
-          <VesselIcon size={14} /> Sea Voyages
-        </button>
-        <button
-          onClick={() => setActiveTab('land')}
-          className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
-            activeTab === 'land'
-              ? 'bg-emerald-600 text-white shadow-lg'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 bg-transparent'
-          }`}
-        >
-          <BusIcon size={14} /> Land Shuttles
-        </button>
-      </div>
+      {isSuperAdmin && (
+        <div className="flex bg-slate-900/60 p-1 rounded-2xl border border-slate-800 self-start max-w-sm">
+          <button
+            onClick={() => setActiveTab('sea')}
+            className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+              activeTab === 'sea'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 bg-transparent'
+            }`}
+          >
+            <VesselIcon size={14} /> Sea Voyages
+          </button>
+          <button
+            onClick={() => setActiveTab('land')}
+            className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+              activeTab === 'land'
+                ? 'bg-emerald-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 bg-transparent'
+            }`}
+          >
+            <BusIcon size={14} /> Land Shuttles
+          </button>
+        </div>
+      )}
 
       {activeTab === 'sea' ? (
         <SurfaceCard className="bg-slate-900/45 p-6 rounded-3xl border border-slate-800/80">
@@ -226,14 +324,16 @@ export const TripManagement: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-400 mt-1">Schedule and manage Batangas-Mindoro shipping operations.</p>
             </div>
-            <Button
-              onClick={() => openShipModal()}
-              variant="primary"
-              size="sm"
-              className="bg-blue-600 text-white hover:bg-blue-500 text-xs font-bold gap-1.5 flex items-center bg-none font-sans uppercase tracking-widest px-4 py-2"
-            >
-              <Plus size={14} /> Add Voyage
-            </Button>
+            {isSuperAdmin && (
+              <Button
+                onClick={() => openShipModal()}
+                variant="primary"
+                size="sm"
+                className="bg-blue-600 text-white hover:bg-blue-500 text-xs font-bold gap-1.5 flex items-center bg-none font-sans uppercase tracking-widest px-4 py-2"
+              >
+                <Plus size={14} /> Add Voyage
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,6 +373,23 @@ export const TripManagement: React.FC = () => {
                         <Calendar size={13} className="text-slate-500" />
                         <span>{formatPST(ship.depTime).split(',')[1]?.trim() || 'Schedule'}</span>
                       </div>
+                      <div className="flex items-center gap-1.5 font-bold col-span-2">
+                        <DollarSign size={13} className="text-amber-500" />
+                        <span className="text-emerald-400 text-sm">
+                          ₱{ship.pricingMode === 'automatic' ? calculateDynamicPrice(ship) : (ship.currentPrice || ship.basePrice || 500)}
+                        </span>
+                        {ship.pricingMode === 'automatic' && (
+                          <span className="text-[9px] text-[#003087] flex items-center gap-1 font-bold bg-[#003087]/10 px-1 py-0.5 rounded border border-[#003087]/20 ml-1">
+                            🔄 Auto
+                          </span>
+                        )}
+                        {ship.pricingMode !== 'automatic' && ship.currentPrice !== ship.basePrice && (
+                           <span className="line-through text-slate-500 text-[10px]">₱{ship.basePrice}</span>
+                        )}
+                        {ship.priceAdjustmentReason && (
+                          <span className="ml-1 text-[9px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20">{ship.priceAdjustmentReason}</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <Users size={13} className="text-slate-500" />
                         <span>Capacity: {ship.capacity}</span>
@@ -285,20 +402,24 @@ export const TripManagement: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-end gap-2 mt-4 pt-1 border-t border-slate-900/60">
-                    <button
-                      onClick={() => openShipModal(ship)}
-                      className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
-                      title="Edit Voyage Details"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleShipDelete(ship.id, ship.name)}
-                      className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition-all"
-                      title="Delete Voyage"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEditPrices && (
+                      <button
+                        onClick={() => openShipModal(ship)}
+                        className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
+                        title="Edit Voyage Details"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleShipDelete(ship.id, ship.name)}
+                        className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition-all"
+                        title="Delete Voyage"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -314,14 +435,16 @@ export const TripManagement: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-400 mt-1">Audit and dispatch Bus & Van transfers across Occidental Mindoro.</p>
             </div>
-            <Button
-              onClick={() => openTripModal()}
-              variant="primary"
-              size="sm"
-              className="bg-emerald-600 text-white hover:bg-emerald-500 text-xs font-bold gap-1.5 flex items-center bg-none font-sans uppercase tracking-widest px-4 py-2"
-            >
-              <Plus size={14} /> Add Shuttle Run
-            </Button>
+            {isSuperAdmin && (
+              <Button
+                onClick={() => openTripModal()}
+                variant="primary"
+                size="sm"
+                className="bg-emerald-600 text-white hover:bg-emerald-500 text-xs font-bold gap-1.5 flex items-center bg-none font-sans uppercase tracking-widest px-4 py-2"
+              >
+                <Plus size={14} /> Add Shuttle Run
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -362,6 +485,23 @@ export const TripManagement: React.FC = () => {
                         <Calendar size={13} className="text-slate-500" />
                         <span>{formatPST(trip.depTime).split(',')[1]?.trim() || 'Schedule'}</span>
                       </div>
+                      <div className="flex items-center gap-1.5 font-bold col-span-2">
+                        <DollarSign size={13} className="text-amber-500" />
+                        <span className="text-emerald-400 text-sm">
+                          ₱{trip.pricingMode === 'automatic' ? calculateDynamicPrice(trip) : (trip.currentPrice || trip.basePrice || 200)}
+                        </span>
+                        {trip.pricingMode === 'automatic' && (
+                          <span className="text-[9px] text-[#FF8800] flex items-center gap-1 font-bold bg-[#FF8800]/10 px-1 py-0.5 rounded border border-[#FF8800]/20 ml-1">
+                            🔄 Auto
+                          </span>
+                        )}
+                        {trip.pricingMode !== 'automatic' && trip.currentPrice !== trip.basePrice && (
+                           <span className="line-through text-slate-500 text-[10px]">₱{trip.basePrice}</span>
+                        )}
+                        {trip.priceAdjustmentReason && (
+                          <span className="ml-1 text-[9px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20">{trip.priceAdjustmentReason}</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <Users size={13} className="text-slate-500" />
                         <span>Seats: {trip.capacity}</span>
@@ -374,20 +514,24 @@ export const TripManagement: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-end gap-2 mt-4 pt-1 border-t border-slate-900/60">
-                    <button
-                      onClick={() => openTripModal(trip)}
-                      className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
-                      title="Edit Shuttle Details"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleTripDelete(trip.id, trip.route)}
-                      className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition-all"
-                      title="Delete Shuttle Dispatch"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEditPrices && (
+                      <button
+                        onClick={() => openTripModal(trip)}
+                        className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
+                        title="Edit Shuttle Details"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleTripDelete(trip.id, trip.route)}
+                        className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition-all"
+                        title="Delete Shuttle Dispatch"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -492,6 +636,87 @@ export const TripManagement: React.FC = () => {
                   </select>
                 </div>
                 
+                <div className="col-span-2 grid grid-cols-2 gap-4 border border-blue-900/40 bg-blue-900/10 p-4 rounded-2xl mt-4">
+                  <div className="col-span-2 flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-white uppercase tracking-wider">Pricing Mode</label>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setShipForm({ ...shipForm, pricingMode: 'manual' })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${shipForm.pricingMode === 'manual' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        MANUAL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShipForm({ ...shipForm, pricingMode: 'automatic' })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${shipForm.pricingMode === 'automatic' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        AUTOMATIC
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><DollarSign size={12}/> Base Fare</label>
+                    <input
+                      type="number" required min={0}
+                      value={shipForm.basePrice}
+                      onChange={e => setShipForm({ ...shipForm, basePrice: Number(e.target.value) })}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><DollarSign size={12}/> Current Fare</label>
+                    <input
+                      type="number" required min={0}
+                      value={shipForm.currentPrice}
+                      onChange={e => setShipForm({ ...shipForm, currentPrice: Number(e.target.value) })}
+                      disabled={shipForm.pricingMode === 'automatic'}
+                      className={`w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-amber-400 font-bold focus:outline-none ${shipForm.pricingMode === 'automatic' ? 'opacity-50' : ''}`}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Adjustment Reason</label>
+                    <input
+                      type="text" placeholder="e.g. Holiday Surge"
+                      value={shipForm.priceAdjustmentReason}
+                      onChange={e => setShipForm({ ...shipForm, priceAdjustmentReason: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  {shipForm.pricingMode === 'automatic' && (
+                    <div className="col-span-2 space-y-4 border-t border-slate-800 pt-4 mt-2">
+                      <h4 className="text-xs font-bold text-blue-400 flex items-center gap-2"><DollarSign size={14}/> Automatic Surge Rules</h4>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Peak Hours (comma separated)</label>
+                        <input 
+                          type="text" 
+                          placeholder="07:00-10:00,16:00-19:00" 
+                          value={shipForm.autoRules?.peakHours?.join(',') || ''}
+                          onChange={(e) => setShipForm({
+                            ...shipForm, 
+                            autoRules: { 
+                              ...shipForm.autoRules, 
+                              peakHours: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                            }
+                          })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Weekend Multiplier</label>
+                          <input type="number" step="0.05" value={shipForm.autoRules?.weekendMultiplier || 1.25} onChange={e => setShipForm({...shipForm, autoRules: {...shipForm.autoRules, weekendMultiplier: Number(e.target.value)}})} className="w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Low Seat Multiplier</label>
+                          <input type="number" step="0.05" value={shipForm.autoRules?.lowSeatMultiplier || 1.35} onChange={e => setShipForm({...shipForm, autoRules: {...shipForm.autoRules, lowSeatMultiplier: Number(e.target.value)}})} className="w-full bg-slate-950 border border-slate-800 focus:border-blue-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {editingShip && (
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Override Available Seats (Currently {shipForm.available})</label>
@@ -616,6 +841,87 @@ export const TripManagement: React.FC = () => {
                     <option value="Completed">Completed Run</option>
                     <option value="Cancelled">Cancelled</option>
                   </select>
+                </div>
+                
+                <div className="col-span-2 grid grid-cols-2 gap-4 border border-emerald-900/40 bg-emerald-900/10 p-4 rounded-2xl mt-4">
+                  <div className="col-span-2 flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-white uppercase tracking-wider">Pricing Mode</label>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setTripForm({ ...tripForm, pricingMode: 'manual' })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tripForm.pricingMode === 'manual' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        MANUAL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTripForm({ ...tripForm, pricingMode: 'automatic' })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tripForm.pricingMode === 'automatic' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        AUTOMATIC
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><DollarSign size={12}/> Base Fare</label>
+                    <input
+                      type="number" required min={0}
+                      value={tripForm.basePrice}
+                      onChange={e => setTripForm({ ...tripForm, basePrice: Number(e.target.value) })}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><DollarSign size={12}/> Current Fare</label>
+                    <input
+                      type="number" required min={0}
+                      value={tripForm.currentPrice}
+                      onChange={e => setTripForm({ ...tripForm, currentPrice: Number(e.target.value) })}
+                      disabled={tripForm.pricingMode === 'automatic'}
+                      className={`w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-amber-400 font-bold focus:outline-none ${tripForm.pricingMode === 'automatic' ? 'opacity-50' : ''}`}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Adjustment Reason</label>
+                    <input
+                      type="text" placeholder="e.g. Rush Hour"
+                      value={tripForm.priceAdjustmentReason}
+                      onChange={e => setTripForm({ ...tripForm, priceAdjustmentReason: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  {tripForm.pricingMode === 'automatic' && (
+                    <div className="col-span-2 space-y-4 border-t border-slate-800 pt-4 mt-2">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-2"><DollarSign size={14}/> Automatic Surge Rules</h4>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Peak Hours (comma separated)</label>
+                        <input 
+                          type="text" 
+                          placeholder="07:00-10:00,16:00-19:00" 
+                          value={tripForm.autoRules?.peakHours?.join(',') || ''}
+                          onChange={(e) => setTripForm({
+                            ...tripForm, 
+                            autoRules: { 
+                              ...tripForm.autoRules, 
+                              peakHours: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                            }
+                          })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Weekend Multiplier</label>
+                          <input type="number" step="0.05" value={tripForm.autoRules?.weekendMultiplier || 1.25} onChange={e => setTripForm({...tripForm, autoRules: {...tripForm.autoRules, weekendMultiplier: Number(e.target.value)}})} className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Low Seat Multiplier</label>
+                          <input type="number" step="0.05" value={tripForm.autoRules?.lowSeatMultiplier || 1.35} onChange={e => setTripForm({...tripForm, autoRules: {...tripForm.autoRules, lowSeatMultiplier: Number(e.target.value)}})} className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-600 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {editingTrip && (

@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { SummaryCard } from './common/SummaryCard';
 import { TripManagement } from './TripManagement';
+import { CommissionPayout } from './CommissionPayout';
+import { PriceAdjustmentRequest } from './PriceAdjustmentRequest';
+import { PriceHistoryViewer } from './PriceHistoryViewer';
 
 export const AdminReportSectionPanel4 = () => {
   const {
@@ -435,6 +438,12 @@ export const AdminReportSectionPanel4 = () => {
       {/* Fleet Dispatch & Trip Management Console */}
       <TripManagement />
 
+      {/* Price History */}
+      <PriceHistoryViewer />
+
+      {/* Price Adjustment Approvals */}
+      <PriceAdjustmentRequest />
+
       {/* 3. TRANSACTION LOG REPORT SECTION WITH REFUND */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
@@ -652,6 +661,9 @@ export const AdminReportSectionPanel4 = () => {
           </div>
         </div>
       </div>
+
+      {/* Commission & Payout System */}
+      <CommissionPayout />
 
       {/* 5. ROLE AUDIT LOG SECTION */}
       <div className="bg-slate-800 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">

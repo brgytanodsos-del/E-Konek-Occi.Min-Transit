@@ -3,6 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { motion, AnimatePresence } from 'motion/react';
 import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
+import { calculateDynamicPrice } from '../../lib/pricingEngine';
+import { RefreshCw } from 'lucide-react';
 
 interface Panel3Props {
   isSuperAdmin: boolean;
@@ -64,6 +66,17 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
   // Interactive pulse and countdowns
   const [refreshTimer, setRefreshTimer] = useState(30);
   const [pulseActive, setPulseActive] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const manualRefresh = () => {
+    setRefreshing(true);
+    setPulseActive(true);
+    setRefreshTimer(30);
+    setTimeout(() => {
+      setRefreshing(false);
+      setPulseActive(false);
+    }, 800);
+  };
 
   // Local AI Voice Synthesis States
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>('feminine');
@@ -664,6 +677,14 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
             <p className="text-xs text-slate-400 font-semibold">Departure estimates synchronized under Philippine Standard Time (PST)</p>
           </div>
           <div className="bg-slate-50 border border-slate-150 py-1.5 px-4 rounded-2xl flex items-center gap-3 shrink-0 self-stretch sm:self-auto text-center">
+            <button 
+                onClick={manualRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-xl transition text-[10px] font-bold tracking-wider"
+            >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'REFRESHING...' : 'REFRESH PRICES'}
+            </button>
             <div className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF8800]"></span>
@@ -701,6 +722,22 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
                       <i className="fa-solid fa-map-pin text-[10px] text-slate-400"></i> {s.route}
                     </span>
                     <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(s.depTime)}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-emerald-600 font-black text-xs">
+                          ₱{s.pricingMode === 'automatic' ? calculateDynamicPrice(s) : (s.currentPrice || s.basePrice || 500)}
+                        </span>
+                        {s.pricingMode === 'automatic' && (
+                          <span className="text-[9px] text-[#003087] flex items-center gap-1 mt-0.5 font-bold bg-[#003087]/10 px-1 py-0.5 rounded border border-[#003087]/20">
+                            🔄 Auto-adjusted
+                          </span>
+                        )}
+                        {s.pricingMode !== 'automatic' && s.currentPrice !== s.basePrice && (
+                          <span className="text-slate-400 line-through text-[10px]">₱{s.basePrice}</span>
+                        )}
+                        {s.priceAdjustmentReason && (
+                          <span className="text-[9px] text-amber-600 italic">* {s.priceAdjustmentReason}</span>
+                        )}
+                    </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1.5">
                     {s.available <= 0 ? (
@@ -746,6 +783,22 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
                       <i className="fa-solid fa-location-arrow text-[10px] text-slate-400"></i> {t.route}
                     </span>
                     <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(t.depTime)}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-emerald-600 font-black text-xs">
+                          ₱{t.pricingMode === 'automatic' ? calculateDynamicPrice(t) : (t.currentPrice || t.basePrice || 200)}
+                        </span>
+                        {t.pricingMode === 'automatic' && (
+                          <span className="text-[9px] text-[#FF8800] flex items-center gap-1 mt-0.5 font-bold bg-[#FF8800]/10 px-1 py-0.5 rounded border border-[#FF8800]/20">
+                            🔄 Auto-adjusted
+                          </span>
+                        )}
+                        {t.pricingMode !== 'automatic' && t.currentPrice !== t.basePrice && (
+                          <span className="text-slate-400 line-through text-[10px]">₱{t.basePrice}</span>
+                        )}
+                        {t.priceAdjustmentReason && (
+                          <span className="text-[9px] text-amber-600 italic">* {t.priceAdjustmentReason}</span>
+                        )}
+                    </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1.5">
                     {t.available <= 0 ? (

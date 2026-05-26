@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
 import { QRCodeScanner } from '../../components/common/QRCodeScanner';
 import { toast } from 'sonner';
+import { PriceAdjustmentRequest } from '../../components/PriceAdjustmentRequest';
+import { TripManagement } from '../../components/TripManagement';
 
 interface Panel1Props {
   isSuperAdmin: boolean;
@@ -251,6 +253,8 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
         ))}
       </div>
 
+      <PriceAdjustmentRequest />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4 relative z-10 overflow-hidden">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3 relative z-10">
@@ -495,6 +499,9 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
           </div>
         </div>
       )}
+
+      {/* Advanced Pricing & Scheduling Management */}
+      <TripManagement />
 
       {/* BRANDED PREMIUM PRINT TICKET MODAL */}
       {selectedTicket && (

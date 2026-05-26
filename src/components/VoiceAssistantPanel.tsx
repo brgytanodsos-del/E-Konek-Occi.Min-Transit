@@ -110,6 +110,11 @@ export const VoiceAssistantPanel: React.FC<VoiceAssistantPanelProps> = ({ isOpen
           const weatherTl = `Impormasyon sa panahon. Ang temperatura sa Mamburao ay ${mamTemp.toFixed(1)} degrees celsius. Ang bilis ng hangin sa Abra port ay ${abraWind.toFixed(1)} kilometro bawat oras.`;
           handleSpeak(weatherEn, weatherTl);
           if (!isContinuous) setListening(false);
+        } else if (command.includes("price") || command.includes("how much") || command.includes("cost") || command.includes("presyo") || command.includes("magkano")) {
+          const priceEn = `Checking current prices. Mamburao to Abra Port is currently 520 pesos with surge pricing.`;
+          const priceTl = `Tinitignan ang kasalukuyang presyo. Ang pamasahe mula Mamburao papuntang Abra Port ay 520 pesos at nakakaranas ng surge pricing.`;
+          handleSpeak(priceEn, priceTl);
+          if (!isContinuous) setListening(false);
         } else if (command.includes("magandang umaga") || command.includes("good morning")) {
           handleSpeak("Good morning! Welcome to Mindoro Transit Hub.", "Magandang umaga po! Maligayang pagdating sa Mindoro Transit Hub.");
           if (!isContinuous) setListening(false);

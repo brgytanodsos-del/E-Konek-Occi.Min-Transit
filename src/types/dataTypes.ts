@@ -8,6 +8,19 @@ export interface Ship {
   capacity: number;
   available: number;
   type: 'RORO' | 'Passenger Ferry';
+  basePrice?: number;
+  currentPrice?: number;
+  priceMultiplier?: number;
+  lastPriceUpdatedBy?: string;
+  lastPriceUpdatedAt?: string;
+  priceAdjustmentReason?: string;
+  pricingMode?: 'manual' | 'automatic';
+  autoRules?: {
+    peakHours?: string[];
+    weekendMultiplier?: number;
+    lowSeatThreshold?: number;
+    lowSeatMultiplier?: number;
+  };
 }
 
 export interface Trip {
@@ -19,6 +32,19 @@ export interface Trip {
   capacity: number;
   available: number;
   status: 'Scheduled' | 'Boarding' | 'Departed' | 'Completed' | 'Cancelled';
+  basePrice?: number;
+  currentPrice?: number;
+  priceMultiplier?: number;
+  lastPriceUpdatedBy?: string;
+  lastPriceUpdatedAt?: string;
+  priceAdjustmentReason?: string;
+  pricingMode?: 'manual' | 'automatic';
+  autoRules?: {
+    peakHours?: string[];
+    weekendMultiplier?: number;
+    lowSeatThreshold?: number;
+    lowSeatMultiplier?: number;
+  };
 }
 
 export interface FerryBooking {

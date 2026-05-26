@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { motion, AnimatePresence } from 'motion/react';
+import { PriceAdjustmentRequest } from '../../components/PriceAdjustmentRequest';
+import { TripManagement } from '../../components/TripManagement';
 
 interface Panel2Props {
   isSuperAdmin: boolean;
@@ -230,6 +232,8 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
         ))}
       </div>
 
+      <PriceAdjustmentRequest />
+
       <div className="flex border-b border-slate-200">
         {['manager', 'sync', 'map'].map((t: any) => (
           <button key={t} onClick={() => setActiveTab(t)} className={`px-6 py-3 font-black text-xs uppercase tracking-wider -mb-[1px] border-b-2 transition-all capitalize ${activeTab === t ? 'border-[#FF8800] text-[#FF8800]' : 'border-transparent text-slate-400'}`}>{t}</button>
@@ -357,6 +361,10 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
           </div>
         </div>
       )}
+
+      {/* Advanced Pricing & Scheduling Management */}
+      <TripManagement />
+
     </div>
   );
 };

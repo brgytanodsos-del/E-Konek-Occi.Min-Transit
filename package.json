@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "e-konek-occimin-transit",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Maritime Transit Management System for Occidental Mindoro",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -9,7 +10,10 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "lint:fix": "tsc --noEmit --pretty",
+    "deploy": "npm run build && firebase deploy",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
