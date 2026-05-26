@@ -96,13 +96,12 @@ export interface UserAccount {
 export interface AdminAccount {
   id: string;
   fullName: string;
-  mobileNumber?: string;
-  role: 'port' | 'terminal' | 'driver' | 'superadmin';
+  mobileNumber: string;
+  role: 'port' | 'terminal' | 'driver';
   workId?: string;           // port staff only
   terminalMemberId?: string; // terminal staff or driver
-  selfieUrl?: string;
-  email?: string;
-  pin?: string;
+  selfieUrl: string;
+  email: string;
   createdAt: string;
   lastLogin: string;
   status: 'active' | 'suspended' | 'pending';

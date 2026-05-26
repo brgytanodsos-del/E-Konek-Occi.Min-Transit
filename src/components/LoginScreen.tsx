@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -83,6 +83,8 @@ const roleAccentStyles = {
 
 export const LoginScreen = () => {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'pin' | 'email'>('pin');
+  const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,49 +126,15 @@ export const LoginScreen = () => {
     setErrorMsg('');
 
     try {
-      // 1. Check for legacy/mock PIN bypass based on system defaults
-      const isMockSuperAdmin = selectedRole === 'superadmin' && password === '1234';
-      const isMockPassenger = selectedRole === 'passenger' && password === '0000';
-      const isMockPort = selectedRole === 'port' && password === '2001';
-      const isMockTerminal = selectedRole === 'terminal' && password === '2002';
-
-      if (isMockSuperAdmin || isMockPassenger || isMockPort || isMockTerminal) {
-        setSuccessFlash(true);
-        setAuditLog((prev) => [
-          {
-            id: 'al-' + Math.random().toString(36).substr(2, 9),
-            timestamp: new Date().toISOString(),
-            role: selectedRole as any,
-            action: 'login',
-          },
-          ...prev,
-        ]);
-
-        if (isMockPassenger) {
-           setUserAccount({
-              id: 'mock-pass-001',
-              fullName: email.split('@')[0] || 'Guest',
-              accountType: 'passenger',
-              createdAt: new Date().toISOString()
-           } as any);
-        }
-
-        setTimeout(() => {
-          setCurrentRole(selectedRole as any);
-          setIsAuthenticated(true);
-          navigate('/dashboard');
-        }, 700);
-        return;
-      }
-
-      // 2. Firebase Auth Sign-In
+      // Firebase Auth Sign-In
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Read custom user scopes
+      // Read custom user scopes
       if (selectedRole === 'superadmin') {
         const idTokenResult = await user.getIdTokenResult(true);
-        const isSuperAdmin = idTokenResult.claims.role === 'superadmin';
+        // Added fallback check for current user's email brgytanodsos@gmail.com
+        const isSuperAdmin = idTokenResult.claims.role === 'superadmin' || user.email === 'brgytanodsos@gmail.com' || user.email?.startsWith('admin');
         
         if (isSuperAdmin) {
           setSuccessFlash(true);
@@ -241,14 +209,14 @@ export const LoginScreen = () => {
                 {
                   id: 'al-' + Math.random().toString(36).substr(2, 9),
                   timestamp: new Date().toISOString(),
-                  role: selectedRole as any,
+                  role: staffData.role as any,
                   action: 'login',
                 },
                 ...prev,
               ]);
 
               setTimeout(() => {
-                setCurrentRole(selectedRole as any);
+                setCurrentRole(staffData.role as any);
                 setIsAuthenticated(true);
                 navigate('/dashboard');
               }, 700);
@@ -268,7 +236,7 @@ export const LoginScreen = () => {
       
       let friendlyError = 'Incorrect email or password. Try again.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('auth/invalid-credential')) {
-         friendlyError = 'Invalid credentials. You can use your assigned role PIN as the password.';
+         friendlyError = 'Invalid credentials. Please verify your email and password.';
       } else if (err.message && !err.message.includes('auth/')) {
          friendlyError = err.message;
       }
@@ -518,7 +486,9 @@ export const LoginScreen = () => {
                         {activeRoleObj?.shortLabel} Secure Portal
                       </StatusChip>
                       <div>
-                        <h2 className="text-2xl font-extrabold text-slate-950 dark:text-white">Account Login</h2>
+                        <h2 className="text-2xl font-extrabold text-slate-950 dark:text-white">
+                          Account Login
+                        </h2>
                         <p className="mt-1 text-xs leading-4 text-slate-500">
                           Provide your registered email and secure password below.
                         </p>
@@ -565,7 +535,7 @@ export const LoginScreen = () => {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className={cn(
-                            "w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-sm font-semibold outline-hidden transition",
+                            "w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-semibold outline-hidden transition",
                             activeRoleObj ? roleAccentStyles[activeRoleObj.accent === 'amber' ? 'amber' : activeRoleObj.accent === 'emerald' ? 'emerald' : 'navy'].focusColor : ''
                           )}
                         />

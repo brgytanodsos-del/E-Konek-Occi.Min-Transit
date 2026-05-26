@@ -41,13 +41,13 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    match /users/{userId} {
+    match /userAccounts/{userId} {
       allow read, write: if isOwner(userId) || isSuperAdmin();
     }
 
     // Admin & Financial - stricter
     match /adminAccounts/{adminId} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if isOwner(adminId) || isSuperAdmin();
     }
 
     match /transactions/{txId} {

@@ -121,8 +121,8 @@ interface AppContextType {
   setAuditLog: React.Dispatch<React.SetStateAction<AuditLog[]>>;
   payoutHistory: PayoutHistory[];
   setPayoutHistory: React.Dispatch<React.SetStateAction<PayoutHistory[]>>;
-  currentRole: 'port' | 'terminal' | 'passenger' | 'superadmin' | null;
-  setCurrentRole: React.Dispatch<React.SetStateAction<'port' | 'terminal' | 'passenger' | 'superadmin' | null>>;
+  currentRole: 'port' | 'terminal' | 'passenger' | 'superadmin' | 'driver' | null;
+  setCurrentRole: React.Dispatch<React.SetStateAction<'port' | 'terminal' | 'passenger' | 'superadmin' | 'driver' | null>>;
   isAuthenticated: boolean;
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   sessionToken: string | null;

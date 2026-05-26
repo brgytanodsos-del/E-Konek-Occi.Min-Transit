@@ -269,7 +269,7 @@ export const getMockSeed = (name: string): any[] => {
           lastLogin: '',
           status: 'active',
         },
-      ] as AdminAccount[];
+      ] as any[] as unknown as AdminAccount[];
 
     default:
       return [];

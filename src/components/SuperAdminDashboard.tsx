@@ -10,6 +10,7 @@ import { VoiceAssistantPanel } from './VoiceAssistantPanel';
 import { PanelHeader } from './common/PanelHeader';
 
 import { AdminReportSectionPanel4 } from './AdminReportSectionPanel4';
+import { PendingApprovalsPanel } from './PendingApprovalsPanel';
 
 export const SuperAdminDashboard = () => {
   const {
@@ -166,14 +167,14 @@ export const SuperAdminDashboard = () => {
         )}
 
         {/* VIEW SCHEME: TERMINAL STAFF */}
-        {currentRole === 'terminal' && (
+        {(currentRole === 'terminal' || currentRole === 'driver') && (
           <div className="flex-1 flex flex-col">
-            <PanelHeader title="Mamburao dispatch Panel">
+            <PanelHeader title={currentRole === 'driver' ? "Driver Dispatch Panel" : "Mamburao dispatch Panel"}>
                 <button
                   onClick={handleLogoutAction}
                   className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
                 >
-                  Logout 🚐
+                  {currentRole === 'driver' ? 'Logout 🚐' : 'Logout 🚐'}
                 </button>
             </PanelHeader>
             <div className="flex-1">
@@ -285,6 +286,7 @@ export const SuperAdminDashboard = () => {
                   {adminActiveTab === 1 && <Panel2 isSuperAdmin={true} />}
                   {adminActiveTab === 2 && <Panel3 isSuperAdmin={true} />}
                   {adminActiveTab === 3 && <AdminReportSectionPanel4 />}
+                  {adminActiveTab === 4 && <PendingApprovalsPanel />}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -295,7 +297,8 @@ export const SuperAdminDashboard = () => {
                 { id: 0, label: 'Port', icon: 'fa-ship', color: 'text-blue-600', activeBg: 'bg-blue-50' },
                 { id: 1, label: 'Hub', icon: 'fa-bus', color: 'text-orange-500', activeBg: 'bg-orange-50' },
                 { id: 2, label: 'Booking', icon: 'fa-user-check', color: 'text-emerald-500', activeBg: 'bg-emerald-50' },
-                { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-indigo-600', activeBg: 'bg-indigo-50' }
+                { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-indigo-600', activeBg: 'bg-indigo-50' },
+                { id: 4, label: 'Pending', icon: 'fa-user-clock', color: 'text-amber-600', activeBg: 'bg-amber-50' }
               ].map(tab => (
                 <button
                   key={tab.id}
