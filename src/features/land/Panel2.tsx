@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { motion, AnimatePresence } from 'motion/react';
 import { PriceAdjustmentRequest } from '../../components/PriceAdjustmentRequest';
-import { TripManagement } from '../../components/TripManagement';
+import { TripManagement } from '../../features/trips/components/TripManagement';
 
 interface Panel2Props {
   isSuperAdmin: boolean;

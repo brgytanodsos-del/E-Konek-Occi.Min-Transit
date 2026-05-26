@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { SummaryCard } from './common/SummaryCard';
-import { TripManagement } from './TripManagement';
+import { TripManagement } from '../features/trips/components/TripManagement';
 import { CommissionPayout } from './CommissionPayout';
 import { PriceAdjustmentRequest } from './PriceAdjustmentRequest';
 import { PriceHistoryViewer } from './PriceHistoryViewer';

@@ -6,7 +6,7 @@ import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speec
 import { QRCodeScanner } from '../../components/common/QRCodeScanner';
 import { toast } from 'sonner';
 import { PriceAdjustmentRequest } from '../../components/PriceAdjustmentRequest';
-import { TripManagement } from '../../components/TripManagement';
+import { TripManagement } from '../../features/trips/components/TripManagement';
 
 interface Panel1Props {
   isSuperAdmin: boolean;

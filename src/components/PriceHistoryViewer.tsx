@@ -1,48 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import React, { useState } from 'react';
 import { SurfaceCard } from './ui';
 import { History } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-
-interface PriceChange {
-  id: string;
-  previousPrice: number;
-  newPrice: number;
-  multiplier?: number;
-  reason: string;
-  changedBy: string;
-  changedAt: string;
-}
+import { usePriceHistory } from '../hooks/usePriceHistory';
 
 export const PriceHistoryViewer: React.FC = () => {
   const { ships, trips } = useApp();
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const [selectedType, setSelectedType] = useState<'ship' | 'trip'>('ship');
-  const [history, setHistory] = useState<PriceChange[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  // Load history when trip/ship is selected
-  useEffect(() => {
-    if (!selectedRouteId) {
-      setHistory([]);
-      return;
-    }
+  const { data: history, loading, error } = usePriceHistory(selectedRouteId, selectedType);
 
-    setLoading(true);
-    const collectionName = selectedType === 'ship' ? 'ships' : 'trips';
-    const q = query(
-      collection(db, `${collectionName}/${selectedRouteId}/priceHistory`),
-      orderBy('changedAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PriceChange)));
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, [selectedRouteId, selectedType]);
 
   const handleSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;

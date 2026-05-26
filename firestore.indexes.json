@@ -1,0 +1,27 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "priceHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "changedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "depTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ships",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "depTime", "order": "ASCENDING" }
+      ]
+    }
+  ]
+}

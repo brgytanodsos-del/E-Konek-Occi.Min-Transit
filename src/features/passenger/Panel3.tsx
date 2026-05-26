@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { speakAnnouncement, stopSpeaking, VoiceProfile } from '../../utils/speech';
 import { calculateDynamicPrice } from '../../lib/pricingEngine';
 import { RefreshCw } from 'lucide-react';
+import { DepartureBoards } from './components/DepartureBoards';
 
 interface Panel3Props {
   isSuperAdmin: boolean;
@@ -386,77 +387,13 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
 
   // TRACK MY RIDE VIEW (Full Screen Mapping)
   if (trackedTripId) {
-    const tripObj = trips.find(t => t.id === trackedTripId);
-
     return (
-      <div className="panel-page min-h-[calc(100vh-80px)] bg-slate-50/70 backdrop-blur-[2px] flex flex-col animate-fade-in relative text-slate-850">
-        {/* Navigation bar */}
-        <div className="bg-[#003087] text-white p-4 flex items-center justify-between shadow-md border-b-2 border-[#FF8800]">
-          <div className="flex items-center gap-3">
-            <span className="p-2 bg-white/10 rounded-xl text-yellow-300 animate-pulse text-sm">
-              <i className="fa-solid fa-satellite-dish"></i>
-            </span>
-            <div>
-              <p className="font-black text-xs sm:text-sm uppercase tracking-wider">Active GPS Vehicle Telemetry</p>
-              <p className="text-[10px] text-white/70 font-semibold">Centennial Highway Real-time Coordinates Feed</p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              setTrackedTripId(null);
-              setEtaSeconds(15 * 60);
-            }}
-            className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150 focus:ring-2 focus ring-[#FF8800] active:scale-95 cursor-pointer"
-          >
-            <i className="fa-solid fa-circle-xmark mr-1"></i> Close Tracker
-          </button>
-        </div>
-
-        {/* Map Stage container */}
-        <div ref={trackMapRef} className="flex-1 w-full bg-slate-200" style={{ minHeight: '350px' }} />
-
-        {/* Live Tracking Information Card */}
-        {tripObj && (
-          <div className="bg-white border-t-4 border-[#FF8800] p-6 rounded-t-3xl shadow-2xl space-y-4 max-w-lg mx-auto w-full absolute bottom-0 left-0 right-0 z-[1000] animate-slide-up">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="bg-[#003087]/10 text-[#003087] border border-[#003087]/20 text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full">
-                  {tripObj.type} Class Network
-                </span>
-                <h4 className="font-black text-slate-800 text-base mt-2 flex items-center gap-1.5">
-                  <span className="text-[#FF8800]"><i className="fa-solid fa-route"></i></span>
-                  {tripObj.route}
-                </h4>
-              </div>
-              <div className="bg-orange-50/80 border border-orange-200/50 px-3 py-1.5 rounded-2xl text-right">
-                <span className="text-[9px] font-black text-slate-500 block uppercase font-mono tracking-wider">Estimated Transit</span>
-                <span className="text-xs sm:text-sm font-black text-[#FF8800] font-mono">{formatETA(etaSeconds)}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs border-t border-dashed border-slate-100 pt-3">
-              <div className="bg-slate-50 p-3 rounded-xl">
-                <p className="font-black text-slate-400 uppercase tracking-wider text-[9px]">Assigned Driver</p>
-                <p className="font-black text-slate-700 mt-1 flex items-center gap-1">
-                  <span className="text-slate-400"><i className="fa-solid fa-user-circle"></i></span>
-                  {tripObj.driver}
-                </p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-xl">
-                <p className="font-black text-slate-400 uppercase tracking-wider text-[9px]">Seats Capacity</p>
-                <p className="font-black text-[#009E49] mt-1 flex items-center gap-1 animate-pulse">
-                  <span><i className="fa-solid fa-chair text-emerald-500"></i></span>
-                  {tripObj.available} / {tripObj.capacity} Open
-                </p>
-              </div>
-            </div>
-            
-            <p className="text-[10px] text-slate-400 text-center leading-normal font-medium bg-slate-50 py-1.5 rounded-lg border border-slate-100 uppercase tracking-wider">
-              🟢 Telematic map coordinate markers auto-refreshing every 3.0s
-            </p>
-          </div>
-        )}
-      </div>
+      <LiveTrackingView 
+        trackedTripId={trackedTripId} 
+        trips={trips} 
+        getTripLocation={getTripLocation} 
+        onClose={() => setTrackedTripId(null)} 
+      />
     );
   }
 
@@ -667,161 +604,15 @@ export const Panel3 = ({ isSuperAdmin }: Panel3Props) => {
       </div>
 
       {/* DYNAMIC COUNTDOWN & SCHEDULE BOARDS */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-slate-100 p-5 rounded-3xl shadow-sm gap-4">
-          <div>
-            <h3 className="font-extrabold text-base text-slate-800 tracking-tight flex items-center gap-1.5">
-              <span><i className="fa-solid fa-clock-rotate-left text-slate-400"></i></span>
-              Integrated Sea-to-Land Departures Terminal Board
-            </h3>
-            <p className="text-xs text-slate-400 font-semibold">Departure estimates synchronized under Philippine Standard Time (PST)</p>
-          </div>
-          <div className="bg-slate-50 border border-slate-150 py-1.5 px-4 rounded-2xl flex items-center gap-3 shrink-0 self-stretch sm:self-auto text-center">
-            <button 
-                onClick={manualRefresh}
-                disabled={refreshing}
-                className="flex items-center gap-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-xl transition text-[10px] font-bold tracking-wider"
-            >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'REFRESHING...' : 'REFRESH PRICES'}
-            </button>
-            <div className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF8800]"></span>
-            </div>
-            <span className="text-xs font-black text-slate-755 font-mono">
-              Schedules refresh in <b className="text-[#FF8800]">{refreshTimer}s</b>
-            </span>
-          </div>
-        </div>
-
-        {/* Side-by-Side Departures Board with premium detailing */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Montenegro Ferry Crossings Board */}
-          <div className={`bg-white rounded-3xl p-6 border border-slate-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#009E49]' : ''}`}>
-            <div className="flex justify-between items-center border-b border-slate-50 pb-3 mb-4">
-              <h4 className="font-black text-xs sm:text-sm text-[#003087] uppercase tracking-wider flex items-center gap-1.5">
-                <span className="text-[#009E49]"><i className="fa-solid fa-ship"></i></span> 
-                Montenegro Marine Voyages
-              </h4>
-              <span className="text-[10px] font-black uppercase text-[#009E49] px-2 py-0.5 bg-[#009E49]/15 rounded-full">Abra Pier Dock</span>
-            </div>
-            <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
-              {ships.length === 0 ? (
-                <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
-                  <i className="fa-solid fa-ship text-3xl text-slate-300 mb-2"></i>
-                  <p className="text-slate-500 font-bold text-sm">No scheduled sailings</p>
-                  <p className="text-[10px] text-slate-400">Please check back later.</p>
-                </div>
-              ) : ships.map((s) => (
-                <div key={s.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
-                  <div className="space-y-1">
-                    <span className="font-black text-slate-800 text-sm block">{s.name}</span>
-                    <span className="text-xs text-[#003087] font-semibold flex items-center gap-1">
-                      <i className="fa-solid fa-map-pin text-[10px] text-slate-400"></i> {s.route}
-                    </span>
-                    <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(s.depTime)}</span>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-emerald-600 font-black text-xs">
-                          ₱{s.pricingMode === 'automatic' ? calculateDynamicPrice(s) : (s.currentPrice || s.basePrice || 500)}
-                        </span>
-                        {s.pricingMode === 'automatic' && (
-                          <span className="text-[9px] text-[#003087] flex items-center gap-1 mt-0.5 font-bold bg-[#003087]/10 px-1 py-0.5 rounded border border-[#003087]/20">
-                            🔄 Auto-adjusted
-                          </span>
-                        )}
-                        {s.pricingMode !== 'automatic' && s.currentPrice !== s.basePrice && (
-                          <span className="text-slate-400 line-through text-[10px]">₱{s.basePrice}</span>
-                        )}
-                        {s.priceAdjustmentReason && (
-                          <span className="text-[9px] text-amber-600 italic">* {s.priceAdjustmentReason}</span>
-                        )}
-                    </div>
-                  </div>
-                  <div className="text-right flex flex-col items-end gap-1.5">
-                    {s.available <= 0 ? (
-                      <span className="bg-[#FF8800] text-white font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-widest">SOLD OUT</span>
-                    ) : (
-                      <span className="text-xs text-[#009E49] font-black">{s.available} / {s.capacity} Slots</span>
-                    )}
-
-                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                      s.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
-                      s.status === 'Delayed' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                      'bg-emerald-50 text-emerald-700 border-emerald-100'
-                    }`}>
-                      {s.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Shuttle departure board */}
-          <div className={`bg-white rounded-3xl p-6 border border-slate-100 shadow-sm transition-all duration-300 ${pulseActive ? 'ring-2 ring-[#FF8800]' : ''}`}>
-            <div className="flex justify-between items-center border-b border-slate-50 pb-3 mb-4">
-              <h4 className="font-black text-xs sm:text-sm text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="text-[#FF8800]"><i className="fa-solid fa-truck-moving"></i></span> 
-                Grand Terminal Dispatches
-              </h4>
-              <span className="text-[10px] font-black uppercase text-amber-600 px-2 py-0.5 bg-amber-100/80 rounded-full">Shuttle / Bus</span>
-            </div>
-            <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
-              {trips.length === 0 ? (
-                <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
-                  <i className="fa-solid fa-bus text-3xl text-slate-300 mb-2"></i>
-                  <p className="text-slate-500 font-bold text-sm">No active dispatch schedules</p>
-                  <p className="text-[10px] text-slate-400">Please check back later.</p>
-                </div>
-              ) : trips.map((t) => (
-                <div key={t.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
-                  <div className="space-y-1">
-                    <span className="font-black text-slate-800 text-sm block">{t.driver}</span>
-                    <span className="text-xs text-slate-600 font-semibold flex items-center gap-1">
-                      <i className="fa-solid fa-location-arrow text-[10px] text-slate-400"></i> {t.route}
-                    </span>
-                    <span className="text-[9px] font-mono font-bold text-slate-400 block">{formatPST(t.depTime)}</span>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-emerald-600 font-black text-xs">
-                          ₱{t.pricingMode === 'automatic' ? calculateDynamicPrice(t) : (t.currentPrice || t.basePrice || 200)}
-                        </span>
-                        {t.pricingMode === 'automatic' && (
-                          <span className="text-[9px] text-[#FF8800] flex items-center gap-1 mt-0.5 font-bold bg-[#FF8800]/10 px-1 py-0.5 rounded border border-[#FF8800]/20">
-                            🔄 Auto-adjusted
-                          </span>
-                        )}
-                        {t.pricingMode !== 'automatic' && t.currentPrice !== t.basePrice && (
-                          <span className="text-slate-400 line-through text-[10px]">₱{t.basePrice}</span>
-                        )}
-                        {t.priceAdjustmentReason && (
-                          <span className="text-[9px] text-amber-600 italic">* {t.priceAdjustmentReason}</span>
-                        )}
-                    </div>
-                  </div>
-                  <div className="text-right flex flex-col items-end gap-1.5">
-                    {t.available <= 0 ? (
-                      <span className="bg-[#FF8800] text-white font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-widest">FULL VEHICLE</span>
-                    ) : (
-                      <span className="text-xs text-slate-600 font-extrabold">{t.available} Available</span>
-                    )}
-
-                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                      t.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
-                      t.status === 'Departed' ? 'bg-amber-100 text-[#FF8800] border-amber-200' :
-                      'bg-emerald-50 text-emerald-700 border-emerald-100'
-                    }`}>
-                      {t.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <DepartureBoards
+        ships={ships}
+        trips={trips}
+        formatPST={formatPST}
+        pulseActive={pulseActive}
+        refreshTimer={refreshTimer}
+        refreshing={refreshing}
+        manualRefresh={manualRefresh}
+      />
 
       {/* CONFIRMATION DIALOG / SWEET CARD (Styled elegantly as Boarding Pass Ticket format) */}
       <AnimatePresence>
