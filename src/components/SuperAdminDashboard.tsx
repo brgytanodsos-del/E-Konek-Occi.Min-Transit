@@ -31,7 +31,10 @@ export const SuperAdminDashboard = () => {
     persistPayout,
     setUserAccount,
     isDarkMode,
-    setIsDarkMode
+    setIsDarkMode,
+    autoSyncEnabled,
+    setAutoSyncEnabled,
+    lastSyncTime
   } = useApp();
 
   const navigate = useNavigate();
@@ -211,6 +214,27 @@ export const SuperAdminDashboard = () => {
 
               {/* Secure Confirm Logout */}
               <div className="flex items-center gap-3">
+                {/* Auto Sync Toggle */}
+                <div className="flex items-center gap-2 mr-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/50">
+                  <div className="flex flex-col items-end mr-1">
+                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Sync {autoSyncEnabled ? 'On' : 'Off'}</span>
+                     <span className="text-[8px] text-slate-400 whitespace-nowrap">
+                        {lastSyncTime ? `Last: ${lastSyncTime.toLocaleTimeString()}` : 'Never'}
+                     </span>
+                  </div>
+                  <button
+                    onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${autoSyncEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    role="switch"
+                    aria-checked={autoSyncEnabled}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0'}`}
+                    />
+                  </button>
+                </div>
+
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
                   className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"

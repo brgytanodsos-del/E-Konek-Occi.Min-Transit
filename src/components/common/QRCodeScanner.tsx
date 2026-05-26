@@ -7,13 +7,35 @@ interface QRCodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
   title?: string;
   onCancel: () => void;
+  scanState?: 'idle' | 'validating' | 'success' | 'error';
 }
 
-export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, title = 'Scan QR Code', onCancel }) => {
+export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ 
+  onScanSuccess, 
+  title = 'Scan QR Code', 
+  onCancel,
+  scanState = 'idle'
+}) => {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const { auditLog } = useApp();
 
-  const [status, setStatus] = useState('Scanning...');
+  const getStatusColor = (state: string) => {
+    switch (state) {
+      case 'validating': return 'bg-amber-500';
+      case 'success': return 'bg-emerald-500';
+      case 'error': return 'bg-red-500';
+      default: return 'bg-slate-500';
+    }
+  };
+
+  const getStatusText = (state: string) => {
+    switch (state) {
+      case 'validating': return 'Validating...';
+      case 'success': return 'Success!';
+      case 'error': return 'Error!';
+      default: return 'Scanning...';
+    }
+  };
 
   const qrValidations = auditLog
     .filter((entry) => entry.role === 'port' && entry.action.startsWith('QR_SCAN_VALIDATION_'))
@@ -31,7 +53,6 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, tit
 
     scanner.render(
       (decodedText) => {
-        setStatus('Validating...');
         scanner.clear();
         onScanSuccess(decodedText);
       },
@@ -53,10 +74,13 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, tit
         <h3 className="text-lg font-semibold mb-4">{title}</h3>
         <div className="relative w-full">
           <div id="qr-reader" className="w-full"></div>
-          {/* Status Overlay */}
+          {/* Status Indicator */}
           <div className="absolute inset-x-0 bottom-4 flex justify-center z-10 pointer-events-none">
-            <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-medium animate-pulse">
-              {status}
+            <span className={`${getStatusColor(scanState)} text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg animate-pulse flex items-center gap-2`}>
+              {scanState === 'validating' && <i className="fa-solid fa-spinner fa-spin"></i>}
+              {scanState === 'success' && <i className="fa-solid fa-check"></i>}
+              {scanState === 'error' && <i className="fa-solid fa-xmark"></i>}
+              {getStatusText(scanState)}
             </span>
           </div>
         </div>

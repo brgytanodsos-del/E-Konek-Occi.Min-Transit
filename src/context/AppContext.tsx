@@ -135,6 +135,10 @@ interface AppContextType {
   setAdminAccounts: React.Dispatch<React.SetStateAction<AdminAccount[]>>;
   isDarkMode: boolean;
   setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
+  autoSyncEnabled: boolean;
+  setAutoSyncEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  lastSyncTime: Date | null;
+  setLastSyncTime: React.Dispatch<React.SetStateAction<Date | null>>;
 
   // API methods
   addTransaction: (booking: Booking, confirmedBy: 'Port Admin' | 'Terminal Admin') => Promise<void>;
@@ -178,6 +182,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return false;
   });
+
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(new Date());
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -388,6 +395,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Firestore real-time listeners
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (!autoSyncEnabled) return;
+
+    setLastSyncTime(new Date());
+
     const unsubs: (() => void)[] = [];
 
     const COLLECTIONS: { name: string; setter: React.Dispatch<React.SetStateAction<any[]>> }[] = [
@@ -411,6 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const items: any[] = [];
             snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
             setter(items.length > 0 ? items : getMockSeed(name));
+            setLastSyncTime(new Date());
           },
           (err) => {
             console.warn(`Firestore listener error for ${name}:`, err);
@@ -424,7 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return () => unsubs.forEach((fn) => fn());
-  }, []);
+  }, [autoSyncEnabled]);
 
   // ---------------------------------------------------------------------------
   // Persist helpers
@@ -627,6 +639,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userAccounts, setUserAccounts,
         adminAccounts, setAdminAccounts,
         isDarkMode, setIsDarkMode,
+        autoSyncEnabled, setAutoSyncEnabled,
+        lastSyncTime, setLastSyncTime,
         addTransaction,
         getTripLocation,
         formatPST,

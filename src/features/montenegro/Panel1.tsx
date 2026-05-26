@@ -64,6 +64,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
   // Active print ticket modal booking state
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [scanState, setScanState] = useState<'idle' | 'validating' | 'success' | 'error'>('idle');
 
   // Stats
   const ticketsSoldToday = ferryBookings.filter(b => b.status === 'Confirmed').length;
@@ -75,18 +76,28 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
   const SHIP_STATUSES = ['Scheduled', 'Boarding', 'Departed', 'Delayed', 'Cancelled'];
 
   const handleScanSuccess = (decodedText: string) => {
-    setShowScanner(false);
-    const booking = ferryBookings.find(b => b.id === decodedText);
-    if (!booking) {
-      toast.error('Invalid ticket ref: ' + decodedText);
-      return;
-    }
-    if (booking.status === 'Confirmed') {
-      toast.success('Ticket already confirmed.');
-      return;
-    }
-    setAuditLog(prev => [...prev, { timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_VALIDATION_${booking.id}` }]);
-    handleConfirmBooking(booking);
+    setScanState('validating');
+    
+    // Simulate validation delay for a better UI experience
+    setTimeout(() => {
+        const booking = ferryBookings.find(b => b.id === decodedText);
+        if (!booking) {
+          setScanState('error');
+          toast.error('Invalid ticket ref: ' + decodedText);
+          setTimeout(() => setScanState('idle'), 2000);
+          return;
+        }
+        if (booking.status === 'Confirmed') {
+          setScanState('success');
+          toast.success('Ticket already confirmed.');
+          setTimeout(() => { setScanState('idle'); setShowScanner(false); }, 1500);
+          return;
+        }
+        setScanState('success');
+        setAuditLog(prev => [...prev, { timestamp: new Date().toISOString(), role: 'port', action: `QR_SCAN_VALIDATION_${booking.id}` }]);
+        handleConfirmBooking(booking);
+        setTimeout(() => { setScanState('idle'); setShowScanner(false); }, 1500);
+    }, 1000);
   };
 
   const handleCreateVoyage = async (e: React.FormEvent) => {
@@ -585,6 +596,7 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
         <QRCodeScanner
             onScanSuccess={handleScanSuccess}
             onCancel={() => setShowScanner(false)}
+            scanState={scanState}
         />
       )}
     </div>
