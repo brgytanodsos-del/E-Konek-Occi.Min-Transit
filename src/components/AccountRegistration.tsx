@@ -194,10 +194,16 @@ export const AccountRegistration: React.FC<AccountRegistrationProps> = ({
     } catch (err: any) {
       console.error(err);
       let errMsg = err.message || 'Failed to register passenger. Try again.';
-      if (errMsg.includes('auth/')) {
-         if (err.code === 'auth/email-already-in-use') errMsg = 'This email is already registered. Please sign in instead.';
-         else if (err.code === 'auth/weak-password') errMsg = 'Password is too weak. Please use a stronger password.';
-         else errMsg = 'Failed to register account. Please check your details.';
+      if (err.code?.startsWith('auth/') || errMsg.includes('auth/')) {
+         if (err.code === 'auth/email-already-in-use') {
+           errMsg = 'This email is already registered. Please sign in instead.';
+         } else if (err.code === 'auth/weak-password') {
+           errMsg = 'Password is too weak. Please use a stronger password.';
+         } else if (err.code === 'auth/invalid-credential') {
+           errMsg = 'Invalid security credentials supplied. Please check your setup.';
+         } else {
+           errMsg = 'Failed to register account. Please check your details.';
+         }
       }
       toast.error(errMsg);
     } finally {

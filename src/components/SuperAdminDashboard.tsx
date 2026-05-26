@@ -11,6 +11,10 @@ import { PanelHeader } from './common/PanelHeader';
 
 import { AdminReportSectionPanel4 } from './AdminReportSectionPanel4';
 import { PendingApprovalsPanel } from './PendingApprovalsPanel';
+import { StaffLayout } from './StaffLayout';
+import { AnnouncementsPanel } from './AnnouncementsPanel';
+import { LiveTracking } from './LiveTracking';
+import { NotificationsPanel } from './NotificationsPanel';
 
 export const SuperAdminDashboard = () => {
   const {
@@ -42,6 +46,9 @@ export const SuperAdminDashboard = () => {
 
   // Super Admin panel selection
   const [adminActiveTab, setAdminActiveTab] = useState<number>(0);
+
+  // Notifications bell visibility
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // In-line Super Admin logouts confirmations
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
@@ -149,38 +156,25 @@ export const SuperAdminDashboard = () => {
       {/* Adjust container padding-top for the 28px height status bar */}
       <div className="pt-[28px] flex-1 flex flex-col">
         
-            {/* VIEW SCHEME: PORT STAFF */}
+        {/* VIEW SCHEME: PORT STAFF */}
         {currentRole === 'port' && (
-          <div className="flex-1 flex flex-col">
-            <PanelHeader title="Abra Port Station">
-                <button
-                  onClick={handleLogoutAction}
-                  className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
-                >
-                  Logout 🚢
-                </button>
-            </PanelHeader>
-            <div className="flex-1">
-              <Panel1 isSuperAdmin={false} />
-            </div>
-          </div>
+          <StaffLayout title="Port Operations" subtitle="Abra Port Station">
+            <Panel1 isSuperAdmin={false} />
+          </StaffLayout>
         )}
 
         {/* VIEW SCHEME: TERMINAL STAFF */}
-        {(currentRole === 'terminal' || currentRole === 'driver') && (
-          <div className="flex-1 flex flex-col">
-            <PanelHeader title={currentRole === 'driver' ? "Driver Dispatch Panel" : "Mamburao dispatch Panel"}>
-                <button
-                  onClick={handleLogoutAction}
-                  className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
-                >
-                  {currentRole === 'driver' ? 'Logout 🚐' : 'Logout 🚐'}
-                </button>
-            </PanelHeader>
-            <div className="flex-1">
-              <Panel2 isSuperAdmin={false} />
-            </div>
-          </div>
+        {currentRole === 'terminal' && (
+          <StaffLayout title="Terminal Operations" subtitle="Mamburao Grand Terminal">
+            <Panel2 isSuperAdmin={false} />
+          </StaffLayout>
+        )}
+
+        {/* VIEW SCHEME: DRIVER PANEL */}
+        {currentRole === 'driver' && (
+          <StaffLayout title="Driver Operations" subtitle="Mamburao Transit Fleet">
+            <Panel2 isSuperAdmin={false} />
+          </StaffLayout>
         )}
 
         {/* VIEW SCHEME: PASSENGER PORTAL */}
@@ -237,6 +231,26 @@ export const SuperAdminDashboard = () => {
                   </button>
                 </div>
 
+                <div className="relative">
+                  <button
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    type="button"
+                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md relative"
+                    title="View dynamic command alerts"
+                  >
+                    <i className="fa-solid fa-bell text-sm text-[#003580] dark:text-indigo-400" />
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  </button>
+
+                  <AnimatePresence>
+                    {isNotificationsOpen && (
+                      <div className="absolute right-0 mt-3.5 w-[320px] sm:w-[380px] z-50 shadow-2xl rounded-3xl overflow-hidden animate-fade-in">
+                        <NotificationsPanel onClose={() => setIsNotificationsOpen(false)} />
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
                   className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
@@ -287,18 +301,22 @@ export const SuperAdminDashboard = () => {
                   {adminActiveTab === 2 && <Panel3 isSuperAdmin={true} />}
                   {adminActiveTab === 3 && <AdminReportSectionPanel4 />}
                   {adminActiveTab === 4 && <PendingApprovalsPanel />}
+                  {adminActiveTab === 5 && <AnnouncementsPanel />}
+                  {adminActiveTab === 6 && <LiveTracking />}
                 </motion.div>
               </AnimatePresence>
             </div>
 
             {/* FIXED BOTTOM NAV BAR (z-index 50) */}
-            <nav className="dashboard-nav fixed bottom-0 sm:bottom-6 left-0 sm:left-1/2 right-0 sm:right-auto sm:-translate-x-1/2 bg-white/90 backdrop-blur-xl border border-slate-200/50 sm:rounded-[24px] rounded-t-[24px] h-[76px] z-50 flex justify-around items-center px-6 shadow-2xl sm:min-w-[420px] transition-all overflow-hidden flex-nowrap">
+            <nav className="dashboard-nav fixed bottom-0 sm:bottom-6 left-0 sm:left-1/2 right-0 sm:right-auto sm:-translate-x-1/2 bg-white/90 backdrop-blur-xl border border-slate-200/50 sm:rounded-[24px] rounded-t-[24px] h-[76px] z-50 flex justify-around items-center px-6 shadow-2xl sm:min-w-[580px] transition-all overflow-hidden flex-nowrap">
               {[
                 { id: 0, label: 'Port', icon: 'fa-ship', color: 'text-blue-600', activeBg: 'bg-blue-50' },
                 { id: 1, label: 'Hub', icon: 'fa-bus', color: 'text-orange-500', activeBg: 'bg-orange-50' },
                 { id: 2, label: 'Booking', icon: 'fa-user-check', color: 'text-emerald-500', activeBg: 'bg-emerald-50' },
-                { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-indigo-600', activeBg: 'bg-indigo-50' },
-                { id: 4, label: 'Pending', icon: 'fa-user-clock', color: 'text-amber-600', activeBg: 'bg-amber-50' }
+                { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-[#003580]', activeBg: 'bg-blue-50' },
+                { id: 4, label: 'Pending', icon: 'fa-user-clock', color: 'text-amber-600', activeBg: 'bg-amber-50' },
+                { id: 5, label: 'Circulars', icon: 'fa-bullhorn', color: 'text-rose-600', activeBg: 'bg-rose-50' },
+                { id: 6, label: 'Radar', icon: 'fa-tower-broadcast', color: 'text-emerald-600', activeBg: 'bg-emerald-50' }
               ].map(tab => (
                 <button
                   key={tab.id}

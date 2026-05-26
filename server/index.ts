@@ -7,37 +7,128 @@ import path from 'path';
 import dotenv from 'dotenv';
 import shipRoutes from './routes/shipRoutes';
 import authRoutes from './routes/authRoutes';
-import admin from './firebaseAdmin';
+import admin, { db } from './firebaseAdmin';
 
 dotenv.config();
 
-async function bootstrapSuperAdmin() {
-  const email = process.env.SUPERADMIN_USER;
-  const password = process.env.SUPERADMIN_PASS;
-  
-  if (!email || !password) {
-    console.warn("⚠️ SUPERADMIN_USER or SUPERADMIN_PASS environment variables are not set. Skipping bootstrap.");
-    return;
-  }
+async function bootstrapRoles() {
+  const usersToSeed = [
+    {
+      email: 'brgytanodsos@gmail.com',
+      password: 'SUPER_ADMIN_PASSWORD_1234',
+      displayName: 'System Super Admin',
+      role: 'superadmin',
+      isStaff: false,
+    },
+    {
+      email: 'admin@mindorotransit.com',
+      password: 'SUPER_ADMIN_PASSWORD_1234',
+      displayName: 'MindoroTransit Admin',
+      role: 'superadmin',
+      isStaff: false,
+    },
+    {
+      email: 'port@mindorotransit.com',
+      password: 'PORT_STAFF_PASSWORD_2001',
+      displayName: 'Abra Port Operator',
+      role: 'port',
+      isStaff: true,
+      staffFields: {
+        fullName: 'Abra Port Operator',
+        role: 'port',
+        status: 'active',
+        mobileNumber: '09171232001',
+        workId: 'PORT-2001',
+      }
+    },
+    {
+      email: 'terminal@mindorotransit.com',
+      password: 'TERMINAL_STAFF_PASSWORD_2002',
+      displayName: 'Mamburao Terminal Dispatcher',
+      role: 'terminal',
+      isStaff: true,
+      staffFields: {
+        fullName: 'Mamburao Terminal Dispatcher',
+        role: 'terminal',
+        status: 'active',
+        mobileNumber: '09171232002',
+        memberId: 'TERM-2002',
+      }
+    },
+    {
+      email: 'passenger@mindorotransit.com',
+      password: 'PASSENGER_PASSWORD_0000',
+      displayName: 'Mindoro Passenger',
+      role: 'passenger',
+      isPassenger: true,
+      passengerFields: {
+        fullName: 'Mindoro Passenger',
+        mobileNumber: '09170000000',
+        accountType: 'passenger',
+        email: 'passenger@mindorotransit.com',
+        bookingIds: [],
+        status: 'active',
+        gps: {
+          lat: 13.2083,
+          lng: 120.5911,
+          formattedAddress: 'Mamburao, Occidental Mindoro, Philippines'
+        }
+      }
+    }
+  ];
 
-  try {
-    const user = await admin.auth().getUserByEmail(email);
-    console.log("➡️ Super Admin user already exists:", user.uid);
-    // Refresh claims
-    await admin.auth().setCustomUserClaims(user.uid, { role: 'superadmin' });
-    console.log("➡️ Custom claims for Super Admin ensured.");
-  } catch (err: any) {
-    if (err.code === 'auth/user-not-found') {
-      const newUser = await admin.auth().createUser({
-        email,
-        password,
-        emailVerified: true,
-        displayName: "Super Admin"
-      });
-      await admin.auth().setCustomUserClaims(newUser.uid, { role: 'superadmin' });
-      console.log("❇️ Super Admin user bootstrapped successfully. UID:", newUser.uid);
-    } else {
-      console.error("❌ Error checking/bootstrapping Super Admin:", err.message);
+  console.log('🏁 Starting E-Konek MindoroTransit account bootstrapping...');
+
+  for (const item of usersToSeed) {
+    try {
+      let userRecord;
+      try {
+        userRecord = await admin.auth().getUserByEmail(item.email);
+        console.log(`➡️ Account already exists: ${item.email} (UID: ${userRecord.uid})`);
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found') {
+          userRecord = await admin.auth().createUser({
+            email: item.email,
+            password: item.password,
+            displayName: item.displayName,
+            emailVerified: true,
+          });
+          console.log(`❇️ Created Auth account: ${item.email} (UID: ${userRecord.uid})`);
+        } else {
+          throw err;
+        }
+      }
+
+      // Ensure custom claims are set
+      await admin.auth().setCustomUserClaims(userRecord.uid, { role: item.role });
+      console.log(`🛡️ Set custom role claim '${item.role}' for UID: ${userRecord.uid}`);
+
+      // Ensure corresponding Firestore records exist
+      if (item.isStaff && item.staffFields) {
+        const staffDocRef = db.collection('adminAccounts').doc(userRecord.uid);
+        const docSnap = await staffDocRef.get();
+        if (!docSnap.exists) {
+          await staffDocRef.set({
+            id: userRecord.uid,
+            ...item.staffFields,
+            createdAt: new Date().toISOString(),
+          });
+          console.log(`📄 Initialized Firestore adminAccounts/${userRecord.uid}`);
+        }
+      } else if (item.isPassenger && item.passengerFields) {
+        const passDocRef = db.collection('userAccounts').doc(userRecord.uid);
+        const docSnap = await passDocRef.get();
+        if (!docSnap.exists) {
+          await passDocRef.set({
+            id: userRecord.uid,
+            ...item.passengerFields,
+            createdAt: new Date().toISOString(),
+          });
+          console.log(`📄 Initialized Firestore userAccounts/${userRecord.uid}`);
+        }
+      }
+    } catch (error: any) {
+      console.error(`❌ Error bootstrapping user ${item.email}:`, error.message);
     }
   }
 }
@@ -46,8 +137,8 @@ export async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Run the Super Admin bootstrap task
-  await bootstrapSuperAdmin();
+  // Run the Super Admin & roles bootstrap task
+  await bootstrapRoles();
 
   // Trust proxy for accurate rate limiting behind reverse proxies
   app.set('trust proxy', 1);

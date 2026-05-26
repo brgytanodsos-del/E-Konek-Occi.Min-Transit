@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { SummaryCard } from './common/SummaryCard';
+import { TripManagement } from './TripManagement';
 
 export const AdminReportSectionPanel4 = () => {
   const {
@@ -430,6 +431,9 @@ export const AdminReportSectionPanel4 = () => {
           </div>
         </div>
       </div>
+
+      {/* Fleet Dispatch & Trip Management Console */}
+      <TripManagement />
 
       {/* 3. TRANSACTION LOG REPORT SECTION WITH REFUND */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">

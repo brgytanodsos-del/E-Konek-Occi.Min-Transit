@@ -358,6 +358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleOnline = () => {
       setIsOnline(true);
       toast.success('✅ Live Data Stream Activated');
+      newOfflineQueue.processQueue();
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -366,6 +367,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // syncOfflineQueue() in AppProvider on mount
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      newOfflineQueue.processQueue();
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
