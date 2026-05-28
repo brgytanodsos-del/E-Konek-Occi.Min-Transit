@@ -251,17 +251,33 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                     <tr className="border-b text-[10px] font-black uppercase text-slate-400 font-sans"><th className="py-3">Driver</th><th className="py-3">Route</th><th className="py-3 text-center">Status</th></tr>
                   </thead>
                   <tbody className="divide-y">
+                    <AnimatePresence mode="popLayout">
                     {trips.map(t => (
-                      <tr key={t.id}>
+                      <motion.tr 
+                        key={t.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                      >
                         <td className="py-3.5"><div className="font-extrabold">{t.driver}</div><span className="text-[9px] uppercase font-black text-slate-400">{t.type}</span></td>
                         <td className="py-3.5 font-bold text-slate-600">{t.route}</td>
                         <td className="py-3.5 text-center">
-                          <select value={t.status} onChange={e => localUpdateTripStatus(t.id, e.target.value as any)} className="bg-slate-100 border rounded-xl text-[10px] font-black px-3 py-1">
-                            {TRIP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                          <motion.div
+                            key={`${t.id}-${t.status}`}
+                            initial={{ opacity: 0.5, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <select value={t.status} onChange={e => localUpdateTripStatus(t.id, e.target.value as any)} className="bg-slate-100 border rounded-xl text-[10px] font-black px-3 py-1 cursor-pointer">
+                              {TRIP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </motion.div>
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
+                    </AnimatePresence>
                   </tbody>
                 </table>
               </div>

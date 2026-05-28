@@ -2,6 +2,7 @@ import React from 'react';
 import { Ship, Trip } from '../../../types/dataTypes';
 import { calculateDynamicPrice } from '../../../lib/pricingEngine';
 import { RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   ships: Ship[];
@@ -63,14 +64,28 @@ export const DepartureBoards: React.FC<Props> = ({
             <span className="text-[10px] font-black uppercase text-[#009E49] px-2 py-0.5 bg-[#009E49]/15 rounded-full">Abra Pier Dock</span>
           </div>
           <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
+            <AnimatePresence mode="popLayout">
             {ships.length === 0 ? (
-              <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="py-8 flex flex-col items-center justify-center text-center opacity-60"
+              >
                 <i className="fa-solid fa-ship text-3xl text-slate-300 mb-2"></i>
                 <p className="text-slate-500 font-bold text-sm">No scheduled sailings</p>
                 <p className="text-[10px] text-slate-400">Please check back later.</p>
-              </div>
+              </motion.div>
             ) : ships.map((s) => (
-              <div key={s.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
+              <motion.div 
+                key={s.id} 
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150"
+              >
                 <div className="space-y-1">
                   <span className="font-black text-slate-800 text-sm block">{s.name}</span>
                   <span className="text-xs text-[#003087] font-semibold flex items-center gap-1">
@@ -101,16 +116,22 @@ export const DepartureBoards: React.FC<Props> = ({
                     <span className="text-xs text-[#009E49] font-black">{s.available} / {s.capacity} Slots</span>
                   )}
 
-                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                    s.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
-                    s.status === 'Delayed' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                    'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  }`}>
+                  <motion.span 
+                    key={s.status}
+                    initial={{ opacity: 0.5, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                      s.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
+                      s.status === 'Delayed' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    }`}
+                  >
                     {s.status}
-                  </span>
+                  </motion.span>
                 </div>
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -124,14 +145,28 @@ export const DepartureBoards: React.FC<Props> = ({
             <span className="text-[10px] font-black uppercase text-amber-600 px-2 py-0.5 bg-amber-100/80 rounded-full">Shuttle / Bus</span>
           </div>
           <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
+            <AnimatePresence mode="popLayout">
             {trips.length === 0 ? (
-              <div className="py-8 flex flex-col items-center justify-center text-center opacity-60">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="py-8 flex flex-col items-center justify-center text-center opacity-60"
+              >
                 <i className="fa-solid fa-bus text-3xl text-slate-300 mb-2"></i>
                 <p className="text-slate-500 font-bold text-sm">No active dispatch schedules</p>
                 <p className="text-[10px] text-slate-400">Please check back later.</p>
-              </div>
+              </motion.div>
             ) : trips.map((t) => (
-              <div key={t.id} className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150">
+              <motion.div 
+                key={t.id} 
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="flex justify-between items-center bg-slate-50/30 p-3 rounded-2xl border border-slate-100/30 hover:bg-slate-50/80 transition-all duration-150"
+              >
                 <div className="space-y-1">
                   <span className="font-black text-slate-800 text-sm block">{t.driver}</span>
                   <span className="text-xs text-slate-600 font-semibold flex items-center gap-1">
@@ -162,16 +197,22 @@ export const DepartureBoards: React.FC<Props> = ({
                     <span className="text-xs text-slate-600 font-extrabold">{t.available} Available</span>
                   )}
 
-                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                    t.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
-                    t.status === 'Departed' ? 'bg-amber-100 text-[#FF8800] border-amber-200' :
-                    'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  }`}>
+                  <motion.span 
+                    key={t.status}
+                    initial={{ opacity: 0.5, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                      t.status === 'Boarding' ? 'bg-[#003087]/15 text-[#003087] border-[#003087]/20 animate-pulse' :
+                      t.status === 'Departed' ? 'bg-amber-100 text-[#FF8800] border-amber-200' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    }`}
+                  >
                     {t.status}
-                  </span>
+                  </motion.span>
                 </div>
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
           </div>
         </div>
 

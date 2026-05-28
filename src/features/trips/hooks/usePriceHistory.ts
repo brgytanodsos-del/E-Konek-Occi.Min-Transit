@@ -1,6 +1,6 @@
-import { useCollection } from '../../../lib/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { useState, useEffect } from 'react';
 
 export interface PriceChange {
   id: string;
@@ -12,20 +12,38 @@ export interface PriceChange {
 }
 
 export function usePriceHistory(tripId: string | null) {
-  const priceQuery = tripId 
-    ? query(
-        collection(db, `trips/${tripId}/priceHistory`),
-        orderBy('changedAt', 'desc'),
-        limit(20)
-      )
-    : null;
+  const [data, setData] = useState<PriceChange[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  return useCollection<PriceChange>(priceQuery, {
-    enabled: !!tripId,
-    transform: (docs) => docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      changedAt: doc.data().changedAt?.toDate() || new Date(),
-    })),
-  });
+  useEffect(() => {
+    if (!tripId) {
+      setData([]);
+      return;
+    }
+
+    setLoading(true);
+    const priceQuery = query(
+      collection(db, `trips/${tripId}/priceHistory`),
+      orderBy('changedAt', 'desc'),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(priceQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        changedAt: doc.data().changedAt?.toDate() || new Date(),
+      })) as PriceChange[];
+      setData(docs);
+      setLoading(false);
+    }, (err) => {
+      setError(err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [tripId]);
+
+  return { data, loading, error };
 }

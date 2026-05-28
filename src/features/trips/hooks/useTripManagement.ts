@@ -7,10 +7,11 @@ export function useTripManagement() {
   const app = useApp();
 
   const {
+    userAccount,
+    currentRole,
     trips,
-    setTrips,
     persistTrip,
-    updateBookingStatus,
+    updateTripStatus: persistTripStatus,
     setToastMessage,
     isOnline,
   } = app;
@@ -24,6 +25,8 @@ export function useTripManagement() {
     const operation = {
       type: 'create' as const,
       collection: 'trips',
+      role: currentRole as string,
+      userId: userAccount?.id || 'unknown',
       payload: {
         ...tripData,
         createdAt: new Date(),
@@ -33,41 +36,43 @@ export function useTripManagement() {
 
     try {
       if (isOnline) {
-        await persistTrip(tripData);
-        setToastMessage("Trip created successfully", "success");
+        await persistTrip(tripData as any);
+        setToastMessage("Trip created successfully");
       } else {
         await offlineQueue.add(operation);
-        setToastMessage("Trip queued for sync when online", "info");
+        setToastMessage("Trip queued for sync when online");
       }
     } catch (error) {
       await offlineQueue.add(operation);
-      setToastMessage("Trip saved offline", "warning");
+      setToastMessage("Trip saved offline");
     } finally {
       setIsCreating(false);
     }
-  }, [persistTrip, isOnline, setToastMessage]);
+  }, [persistTrip, isOnline, setToastMessage, currentRole, userAccount]);
 
   const updateTripStatus = useCallback(async (tripId: string, newStatus: string) => {
     const operation = {
       type: 'update' as const,
       collection: 'trips',
       docId: tripId,
+      role: currentRole as string,
+      userId: userAccount?.id || 'unknown',
       payload: { status: newStatus, changedAt: new Date() },
     };
 
     try {
       if (isOnline) {
-        await updateBookingStatus(tripId, newStatus);
-        setToastMessage("Status updated", "success");
+        await persistTripStatus(tripId, newStatus as any);
+        setToastMessage("Status updated");
       } else {
         await offlineQueue.add(operation);
-        setToastMessage("Status change queued", "info");
+        setToastMessage("Status change queued");
       }
     } catch (error) {
       await offlineQueue.add(operation);
-      setToastMessage("Change saved offline", "warning");
+      setToastMessage("Change saved offline");
     }
-  }, [updateBookingStatus, isOnline, setToastMessage]);
+  }, [persistTripStatus, isOnline, setToastMessage, currentRole, userAccount]);
 
   return {
     trips,

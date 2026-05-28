@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -17,11 +18,27 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase App Check (Optional but recommended extra layer of security)
+// Ensure you have generated a ReCaptcha V3 Site Key from the Google Cloud Console.
+// Uncomment the lines below to enforce App Check.
+
+/*
+if (typeof window !== 'undefined') {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
+    isTokenAutoRefreshEnabled: true
+  });
+}
+*/
 
 // CRITICAL: The app will break without specifying firestoreDatabaseId
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
@@ -34,6 +51,9 @@ export {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
   ref,
   uploadBytes,
   getDownloadURL

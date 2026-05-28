@@ -87,7 +87,7 @@ export const TripManagement: React.FC = () => {
         priceMultiplier: ship.priceMultiplier || 1,
         priceAdjustmentReason: ship.priceAdjustmentReason || '',
         pricingMode: ship.pricingMode || 'manual',
-        autoRules: ship.autoRules || { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }
+        autoRules: (ship.autoRules || { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }) as any
       });
     } else {
       setEditingShip(null);
@@ -105,7 +105,7 @@ export const TripManagement: React.FC = () => {
         priceMultiplier: 1,
         priceAdjustmentReason: '',
         pricingMode: 'manual',
-        autoRules: { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }
+        autoRules: { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 } as any
       });
     }
     setShowShipModal(true);
@@ -128,7 +128,7 @@ export const TripManagement: React.FC = () => {
         priceMultiplier: trip.priceMultiplier || 1,
         priceAdjustmentReason: trip.priceAdjustmentReason || '',
         pricingMode: trip.pricingMode || 'manual',
-        autoRules: trip.autoRules || { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }
+        autoRules: (trip.autoRules || { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }) as any
       });
     } else {
       setEditingTrip(null);
@@ -145,7 +145,7 @@ export const TripManagement: React.FC = () => {
         priceMultiplier: 1,
         priceAdjustmentReason: '',
         pricingMode: 'manual',
-        autoRules: { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 }
+        autoRules: { peakHours: [], weekendMultiplier: 1.25, lowSeatMultiplier: 1.35 } as any
       });
     }
     setShowTripModal(true);

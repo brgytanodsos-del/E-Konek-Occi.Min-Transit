@@ -21,7 +21,10 @@ import { StatusChip, cn } from './ui';
 import { 
   auth, 
   db, 
-  signInWithEmailAndPassword 
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
 } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -34,6 +37,9 @@ export const LoginScreen = () => {
   const [successFlash, setSuccessFlash] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isStaffReg, setIsStaffReg] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   const { 
     setCurrentRole, 
@@ -136,6 +142,59 @@ export const LoginScreen = () => {
     e.preventDefault();
     if (!email || !password || loading || successFlash) return;
     await performLogin(email, password);
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail || loading) return;
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetSuccess(true);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Failed to send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const isSuperAdmin = user.email === 'brgytanodsos@gmail.com' || user.email?.startsWith('admin');
+      
+      let resolvedRole = '';
+      if (isSuperAdmin) {
+        resolvedRole = 'superadmin';
+      } else {
+        const adminDoc = await getDoc(doc(db, 'adminAccounts', user.uid));
+        if (adminDoc.exists()) {
+           resolvedRole = adminDoc.data().role;
+        } else {
+           resolvedRole = 'passenger';
+           setUserAccount({
+               name: user.displayName || 'Passenger',
+               email: user.email,
+               uid: user.uid,
+               createdAt: new Date().toISOString()
+           } as any);
+        }
+      }
+      setCurrentRole(resolvedRole as any);
+      setIsAuthenticated(true);
+      navigate('/dashboard');
+    } catch (err: any) {
+       console.error("Google login error", err);
+       setErrorMsg(err.message || 'Google Login Failed');
+    } finally {
+       setLoading(false);
+    }
   };
 
   const handleDemoLogin = async (demoEmail: string, demoPass: string) => {
@@ -316,20 +375,88 @@ export const LoginScreen = () => {
                 errorShake && 'animate-shake ring-2 ring-rose-500/50 border-rose-500/30',
               )}
             >
-              <div className="mb-6">
-                <span className="inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] leading-none bg-[rgba(12,45,87,0.08)] text-[#0c2d57] mb-2 dark:bg-blue-950/40 dark:text-blue-300">
-                  Secure Workspace Entry
-                </span>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <LogIn size={20} className="text-amber-500" />
-                  Sign In
-                </h2>
-                <p className="mt-1 text-xs text-slate-400 font-medium">
-                  Provide your registered email & password properties.
-                </p>
-              </div>
+              {isResetMode ? (
+                <div>
+                  <div className="mb-6">
+                    <span className="inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] leading-none bg-[rgba(12,45,87,0.08)] text-[#0c2d57] mb-2 dark:bg-blue-950/40 dark:text-blue-300">
+                      Account Recovery
+                    </span>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Lock size={20} className="text-amber-500" />
+                      Reset Password
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-400 font-medium">
+                      Enter your email to receive a password reset link.
+                    </p>
+                  </div>
+                  
+                  {resetSuccess ? (
+                    <div className="rounded-xl border border-emerald-200 dark:border-emerald-950 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-4 text-center">
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-3">
+                        Password reset link has been sent to your email.
+                      </p>
+                      <button
+                        onClick={() => setIsResetMode(false)}
+                        className="text-xs font-bold text-[#0c2d57] dark:text-sky-400 underline"
+                      >
+                        Return to Sign In
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handlePasswordReset} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-1.5 pl-1">
+                          Email Address
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                          <input
+                            type="email"
+                            required
+                            placeholder="Enter registered email"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-xs font-semibold outline-hidden focus:border-[#0c2d57] dark:focus:border-amber-400 transition"
+                          />
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full mt-4 py-3 bg-[#0c2d57] dark:bg-sky-600 hover:bg-[#153d6f] dark:hover:bg-sky-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-98 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {loading ? 'Sending...' : 'Send Reset Link'}
+                      </button>
+                      
+                      <div className="text-center mt-4">
+                        <button
+                          type="button"
+                          onClick={() => setIsResetMode(false)}
+                          className="text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        >
+                          Cancel and return to Sign In
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <span className="inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] leading-none bg-[rgba(12,45,87,0.08)] text-[#0c2d57] mb-2 dark:bg-blue-950/40 dark:text-blue-300">
+                      Secure Workspace Entry
+                    </span>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <LogIn size={20} className="text-amber-500" />
+                      Sign In
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-400 font-medium">
+                      Provide your registered email & password properties.
+                    </p>
+                  </div>
 
-              <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-1.5 pl-1">
                     Email Address
@@ -348,9 +475,18 @@ export const LoginScreen = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-1.5 pl-1">
-                    Password
-                  </label>
+                  <div className="flex justify-between items-center mb-1.5 px-1">
+                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setIsResetMode(true); setErrorMsg(''); setResetSuccess(false); setResetEmail(email); }}
+                      className="text-[10px] font-bold text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
                     <input
@@ -378,6 +514,24 @@ export const LoginScreen = () => {
                     'Authenticate Account'
                   )}
                 </button>
+                <div className="relative mt-6 mb-4 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase font-black tracking-wider text-slate-400 bg-white dark:bg-slate-900 px-3">
+                    Or
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl shadow-xs transition-all active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+                  Sign in with Google
+                </button>
               </form>
 
               {/* Status/Error Messages */}
@@ -403,22 +557,25 @@ export const LoginScreen = () => {
                   </motion.p>
                 )}
               </AnimatePresence>
+              </>
+            )}
             </div>
           </div>
 
-          {/* Quick Demo Credentials Panel (MD: 5/12 width) */}
-          <div className="md:col-span-5 space-y-3.5">
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left">
-              <h3 className="text-xs font-black text-[#0c2d57] dark:text-amber-400 flex items-center gap-1.5 uppercase">
-                <Sparkles size={13} className="text-amber-500" />
-                Tester Demo Accounts
-              </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1">
-                Select any pre-configured profile below to instantly pre-fill credentials and authorize.
-              </p>
-            </div>
+          {/* Quick Demo Credentials Panel (MD: 5/12 width) - Hidden in Production */}
+          {(import.meta as any).env?.DEV && (
+            <div className="md:col-span-5 space-y-3.5">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-left">
+                <h3 className="text-xs font-black text-[#0c2d57] dark:text-amber-400 flex items-center gap-1.5 uppercase">
+                  <Sparkles size={13} className="text-amber-500" />
+                  Tester Demo Accounts
+                </h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1">
+                  Select any pre-configured profile below to instantly pre-fill credentials and authorize.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5">
               {demoAccounts.map((account) => {
                 const IconComp = account.icon;
                 return (
@@ -446,8 +603,9 @@ export const LoginScreen = () => {
                   </button>
                 );
               })}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>

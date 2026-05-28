@@ -15,6 +15,7 @@ import { StaffLayout } from './StaffLayout';
 import { AnnouncementsPanel } from './AnnouncementsPanel';
 import { LiveTracking } from './LiveTracking';
 import { NotificationsPanel } from './NotificationsPanel';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
 
 export const SuperAdminDashboard = () => {
   const {
@@ -303,6 +304,7 @@ export const SuperAdminDashboard = () => {
                   {adminActiveTab === 4 && <PendingApprovalsPanel />}
                   {adminActiveTab === 5 && <AnnouncementsPanel />}
                   {adminActiveTab === 6 && <LiveTracking />}
+                  {adminActiveTab === 7 && <DiagnosticsPanel />}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -316,7 +318,8 @@ export const SuperAdminDashboard = () => {
                 { id: 3, label: 'Admin', icon: 'fa-shield-halved', color: 'text-[#003580]', activeBg: 'bg-blue-50' },
                 { id: 4, label: 'Pending', icon: 'fa-user-clock', color: 'text-amber-600', activeBg: 'bg-amber-50' },
                 { id: 5, label: 'Circulars', icon: 'fa-bullhorn', color: 'text-rose-600', activeBg: 'bg-rose-50' },
-                { id: 6, label: 'Radar', icon: 'fa-tower-broadcast', color: 'text-emerald-600', activeBg: 'bg-emerald-50' }
+                { id: 6, label: 'Radar', icon: 'fa-tower-broadcast', color: 'text-emerald-600', activeBg: 'bg-emerald-50' },
+                { id: 7, label: 'Tests', icon: 'fa-stethoscope', color: 'text-indigo-500', activeBg: 'bg-indigo-50' }
               ].map(tab => (
                 <button
                   key={tab.id}

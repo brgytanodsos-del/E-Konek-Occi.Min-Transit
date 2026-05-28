@@ -282,8 +282,17 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 text-sm">
+                <AnimatePresence mode="popLayout">
                 {ships.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                  <motion.tr 
+                    key={s.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="hover:bg-slate-50/70 transition-colors"
+                  >
                     <td className="py-4">
                       <div className="font-extrabold text-slate-800 flex items-center gap-1.5"><span className="text-[#009E49]"><i className="fa-solid fa-ship-laughing text-sm"></i></span>{s.name}</div>
                       <span className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md mt-1 font-mono">{s.type} Class</span>
@@ -297,13 +306,21 @@ export const Panel1 = ({ isSuperAdmin }: Panel1Props) => {
                       </div>
                     </td>
                     <td className="py-4">
-                      <select value={s.status} onChange={(e) => localUpdateShipStatus(s.id, e.target.value as any)}
-                        className="bg-slate-150 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-black px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#009E49] transition-all cursor-pointer shadow-sm">
-                        {SHIP_STATUSES.map(stat => <option key={stat} value={stat}>{stat}</option>)}
-                      </select>
+                      <motion.div
+                        key={`${s.id}-${s.status}`}
+                        initial={{ opacity: 0.5, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <select value={s.status} onChange={(e) => localUpdateShipStatus(s.id, e.target.value as any)}
+                          className="bg-slate-150 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-black px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#009E49] transition-all cursor-pointer shadow-sm">
+                          {SHIP_STATUSES.map(stat => <option key={stat} value={stat}>{stat}</option>)}
+                        </select>
+                      </motion.div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>

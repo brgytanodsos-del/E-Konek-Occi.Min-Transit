@@ -14,18 +14,18 @@ export function useTrips() {
     }
   }, [isOnline, persistShip, setShips]);
 
-  const updateVoyageStatus = useCallback(async (id: string, status: string, type: 'ship' | 'trip') => {
+  const updateVoyageStatus = useCallback(async (id: string, status: Ship['status'] | Trip['status'], type: 'ship' | 'trip') => {
     if (type === 'ship') {
-      setShips(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+      setShips(prev => prev.map(s => s.id === id ? { ...s, status: status as Ship['status'] } : s));
       const shipToUpdate = ships.find(s => s.id === id);
       if (shipToUpdate) {
-        await persistShip({ ...shipToUpdate, status });
+        await persistShip({ ...shipToUpdate, status: status as Ship['status'] });
       }
     } else {
-      setTrips(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+      setTrips(prev => prev.map(t => t.id === id ? { ...t, status: status as Trip['status'] } : t));
       const tripToUpdate = trips.find(t => t.id === id);
       if (tripToUpdate) {
-        await persistTrip({ ...tripToUpdate, status });
+        await persistTrip({ ...tripToUpdate, status: status as Trip['status'] });
       }
     }
   }, [ships, trips, setShips, setTrips, persistShip, persistTrip]);

@@ -98,19 +98,21 @@ export function usePassengerPanel() {
     const operation = {
       type: 'booking' as const,
       collection: 'ferryBookings',
-      payload: { ...bookingData, createdAt: new Date(), status: 'pending', createdBy: userAccount?.uid },
+      userId: userAccount?.id || 'unknown',
+      role: 'passenger',
+      payload: { ...bookingData, createdAt: new Date(), status: 'pending', createdBy: userAccount?.id },
     };
     try {
       if (isOnline) {
         await persistFerryBooking(bookingData);
-        setToastMessage("Ferry booking confirmed", "success");
+        setToastMessage("Ferry booking confirmed");
       } else {
         await offlineQueue.add(operation);
-        setToastMessage(`Booking queued (${pendingQueueCount + 1} pending)`, "info");
+        setToastMessage(`Booking queued (${pendingQueueCount + 1} pending)`);
       }
     } catch (error) {
       await offlineQueue.add(operation);
-      setToastMessage("Booking saved offline. Will sync when online.", "warning");
+      setToastMessage("Booking saved offline. Will sync when online.");
     }
   }, [isOnline, userAccount, pendingQueueCount, persistFerryBooking, setToastMessage]);
 
@@ -118,41 +120,45 @@ export function usePassengerPanel() {
     const operation = {
       type: 'booking' as const,
       collection: 'vanBookings',
+      userId: userAccount?.id || 'unknown',
+      role: 'passenger',
       payload: { ...bookingData, createdAt: new Date() },
     };
     try {
       if (isOnline) {
         await persistVanBooking(bookingData);
-        setToastMessage("Shuttle booking confirmed", "success");
+        setToastMessage("Shuttle booking confirmed");
       } else {
         await offlineQueue.add(operation);
-        setToastMessage("Shuttle booking queued for sync", "info");
+        setToastMessage("Shuttle booking queued for sync");
       }
     } catch (error) {
       await offlineQueue.add(operation);
-      setToastMessage("Saved offline", "warning");
+      setToastMessage("Saved offline");
     }
-  }, [isOnline, persistVanBooking, setToastMessage]);
+  }, [isOnline, persistVanBooking, setToastMessage, userAccount]);
 
   const safeCreateTrip = useCallback(async (tripData: any) => {
     const operation = {
       type: 'create' as const,
       collection: 'trips',
+      userId: userAccount?.id || 'unknown',
+      role: 'passenger',
       payload: tripData,
     };
     try {
       if (isOnline) {
         await persistTrip(tripData);
-        setToastMessage("Trip created successfully", "success");
+        setToastMessage("Trip created successfully");
       } else {
         await offlineQueue.add(operation);
-        setToastMessage("Trip queued for creation", "info");
+        setToastMessage("Trip queued for creation");
       }
     } catch (error) {
       await offlineQueue.add(operation);
-      setToastMessage("Trip saved offline", "warning");
+      setToastMessage("Trip saved offline");
     }
-  }, [isOnline, persistTrip, setToastMessage]);
+  }, [isOnline, persistTrip, setToastMessage, userAccount]);
 
   return {
     trips,

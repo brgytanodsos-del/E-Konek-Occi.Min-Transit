@@ -62,8 +62,8 @@ export default function PassengerPanelView(props: any) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* Weather */}
         <div className="xl:col-span-4 space-y-4">
-          <WeatherWidget location="Abra de Ilog" data={props.abraWeather} />
-          <WeatherWidget location="Mamburao" data={props.mamburaoWeather} />
+          <WeatherWidget title="Abra Port Weather" weatherData={props.abraWeather} isOnline={isOnline} lastUpdated="few minutes ago" />
+          <WeatherWidget title="Mamburao Station Weather" weatherData={props.mamburaoWeather} isOnline={isOnline} lastUpdated="few minutes ago" />
         </div>
 
         {/* Live Tracking - Large Area */}
@@ -74,14 +74,21 @@ export default function PassengerPanelView(props: any) {
         {/* Departure Boards */}
         <div className="xl:col-span-12">
           <DepartureBoards 
+            ships={props.ships}
             trips={trips} 
-            onAnnounce={announce} 
+            formatPST={(time) => props.formatPST ? props.formatPST(time) : new Date(time || '').toLocaleString()}
+            pulseActive={pulseActive}
+            refreshTimer={refreshTimer}
+            refreshing={refreshing}
+            manualRefresh={manualRefresh}
           />
         </div>
 
         {/* Booking Section */}
         <div className="xl:col-span-12">
           <BookingForms
+            ships={props.ships}
+            trips={trips}
             voyageId={voyageId}
             setVoyageId={setVoyageId}
             ferryName={ferryName}
@@ -102,10 +109,15 @@ export default function PassengerPanelView(props: any) {
             seatsCount={seatsCount}
             setSeatsCount={setSeatsCount}
 
-            safePersistFerryBooking={safePersistFerryBooking}
-            safePersistVanBooking={safePersistVanBooking}
+            handleFerryBookingSubmit={(e) => {
+              e.preventDefault();
+              safePersistFerryBooking({ voyageId, ferryName, ferryContact, ticketType });
+            }}
+            handleLandBookingSubmit={(e) => {
+              e.preventDefault();
+              safePersistVanBooking({ tripId, pickupPoint, shuttleName, shuttleContact, seatsCount });
+            }}
             
-            pendingQueueCount={pendingQueueCount}
             isOnline={isOnline}
           />
         </div>

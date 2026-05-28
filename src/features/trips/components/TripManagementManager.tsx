@@ -7,7 +7,7 @@ export default function TripManagementManager() {
   const tripData = useTripManagement();
 
   return (
-    <DataErrorBoundary title="Trip Management Failed">
+    <DataErrorBoundary>
       <TripManagementView {...tripData} />
     </DataErrorBoundary>
   );

@@ -12,7 +12,7 @@ export default function PassengerPanelManager({ isSuperAdmin = false }: Passenge
   const panelData = usePassengerPanel();
 
   return (
-    <DataErrorBoundary title="Passenger Operations Panel">
+    <DataErrorBoundary>
       <PassengerPanelView 
         {...panelData} 
         isSuperAdmin={isSuperAdmin}

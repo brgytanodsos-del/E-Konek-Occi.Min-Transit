@@ -11,7 +11,7 @@ Modern, offline-first, role-based transit management system designed for real ma
 
 ## ✨ Key Features
 
-- **Role-Based Access** with secure 4-digit PIN authentication
+- **Role-Based Access** with Firebase Authentication
 - **Atomic Booking System** with duplicate seat prevention
 - **Real-time GPS Tracking** using Leaflet Maps
 - **Voice Assistant** with English + Tagalog support
@@ -113,7 +113,7 @@ E-Konek is designed as an offline-first PWA, built to survive spotty maritime an
 
 - Atomic transactions to prevent duplicate bookings
 - Role-based Firestore security rules
-- PIN authentication with rate limiting and lockout
+- Authentication with rate limiting and lockout
 - Protected financial operations (refunds require approval)
 
 ---
