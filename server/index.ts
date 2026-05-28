@@ -14,6 +14,13 @@ dotenv.config();
 async function bootstrapRoles() {
   const usersToSeed = [
     {
+      email: 'admin_new@mindorotransit.com',
+      password: 'NewAdminPassword1234!',
+      displayName: 'New Super Admin',
+      role: 'superadmin',
+      isStaff: false,
+    },
+    {
       email: 'brgytanodsos@gmail.com',
       password: 'SUPER_ADMIN_PASSWORD_1234',
       displayName: 'System Super Admin',
@@ -85,15 +92,30 @@ async function bootstrapRoles() {
       try {
         userRecord = await admin.auth().getUserByEmail(item.email);
         console.log(`➡️ Account already exists: ${item.email} (UID: ${userRecord.uid})`);
+        
+        // Force update password for admin accounts
+        if (item.role === 'superadmin') {
+            await admin.auth().updateUser(userRecord.uid, { password: item.password });
+            console.log(`🔄 Force-updated password for admin: ${item.email}`);
+        }
       } catch (err: any) {
         if (err.code === 'auth/user-not-found') {
-          userRecord = await admin.auth().createUser({
-            email: item.email,
-            password: item.password,
-            displayName: item.displayName,
-            emailVerified: true,
-          });
-          console.log(`❇️ Created Auth account: ${item.email} (UID: ${userRecord.uid})`);
+          try {
+            userRecord = await admin.auth().createUser({
+              email: item.email,
+              password: item.password,
+              displayName: item.displayName,
+              emailVerified: true,
+            });
+            console.log(`❇️ Created Auth account: ${item.email} (UID: ${userRecord.uid})`);
+          } catch (createErr: any) {
+            if (createErr.code === 'auth/email-already-in-use') {
+               userRecord = await admin.auth().getUserByEmail(item.email);
+               console.log(`⚠️ Account already in use (caught during creation): ${item.email} (UID: ${userRecord.uid})`);
+            } else {
+              throw createErr;
+            }
+          }
         } else {
           throw err;
         }
@@ -138,7 +160,11 @@ export async function startServer() {
   const PORT = 3000;
 
   // Run the Super Admin & roles bootstrap task
-  await bootstrapRoles();
+  try {
+    await bootstrapRoles();
+  } catch (err: any) {
+    console.error('⚠️ Skipping mandatory roles bootstrapping due to potential permission issues:', err.message);
+  }
 
   // Trust proxy for accurate rate limiting behind reverse proxies
   app.set('trust proxy', 1);

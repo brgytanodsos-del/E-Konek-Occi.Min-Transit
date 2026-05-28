@@ -115,7 +115,12 @@ export const LoginScreen = () => {
       setErrorShake(true);
       let friendlyError = 'Incorrect credentials. Please verify your details.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('auth/invalid-credential')) {
-        friendlyError = 'Invalid email address or password.';
+        // Did they use a demo password but they manually created it with a different password?
+        if (targetPass === 'SUPER_ADMIN_PASSWORD_1234' || targetPass === 'NewAdminPassword1234!' || targetPass === 'PORT_STAFF_PASSWORD_2001' || targetPass === 'TERMINAL_STAFF_PASSWORD_2002' || targetPass === 'PASSENGER_PASSWORD_0000') {
+           friendlyError = 'Demo password rejected. If you created this account manually in Firebase, please type the password you used during creation.';
+        } else {
+           friendlyError = 'Invalid email address or password.';
+        }
       } else if (err.message && !err.message.includes('auth/')) {
         friendlyError = err.message;
       }
@@ -141,7 +146,16 @@ export const LoginScreen = () => {
 
   const demoAccounts = [
     {
-      role: 'Super Admin',
+      role: 'New Super Admin',
+      email: 'admin_new@mindorotransit.com',
+      pass: 'NewAdminPassword1234!',
+      badge: '👑 ADMIN',
+      icon: ShieldCheck,
+      desc: 'Newly created full access admin account',
+      color: 'bg-[rgba(12,45,87,1)] text-[#FFC107]'
+    },
+    {
+      role: 'System Super Admin',
       email: 'brgytanodsos@gmail.com',
       pass: 'SUPER_ADMIN_PASSWORD_1234',
       badge: '🔐 OVERRIDE',

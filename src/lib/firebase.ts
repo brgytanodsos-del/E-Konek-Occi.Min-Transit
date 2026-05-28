@@ -1,50 +1,39 @@
 import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
   doc, 
   setDoc, 
   updateDoc, 
-  deleteDoc, 
-  collection, 
-  getDocs,
-  getDoc
+  deleteDoc 
 } from 'firebase/firestore';
-import { 
-  getAuth, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
 import { 
   getStorage, 
   ref, 
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
-
-const firebaseConfig = {
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || "AIzaSyAAKNYFKegpsJH4NOHQTsp0vRNbKP6NMU4",
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0184019680.firebaseapp.com",
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0184019680",
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0184019680.firebasestorage.app",
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || "282629591129",
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || "1:282629591129:web:83c1cf3be4ea50b004e148"
-};
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (import.meta as any).env?.VITE_FIREBASE_DATABASE_ID || "ai-studio-d31b7f09-688d-43bc-86f1-6bbb3e88699e");
+
+// CRITICAL: The app will break without specifying firestoreDatabaseId
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
 // Re-export Auth & Storage methods as requested
 export {
-  getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  getStorage,
   ref,
   uploadBytes,
   getDownloadURL
