@@ -29,6 +29,8 @@ import {
   setDoc,
   updateDoc,
   getDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -196,30 +198,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLoading(true);
       if (firebaseUser) {
         try {
-          // 1. Check if email is superadmin
-          const isSuper = firebaseUser.email === 'brgytanodsos@gmail.com' || firebaseUser.email?.startsWith('admin');
-          
-          if (isSuper) {
-            // Super Admin
-            setCurrentRole('superadmin');
-            setIsAuthenticated(true);
-            setCurrentUser({
-              id: firebaseUser.uid,
-              fullName: 'System Super Admin',
-              mobileNumber: '',
-              role: 'superadmin' as any,
-              selfieUrl: '',
-              email: firebaseUser.email || '',
-              createdAt: new Date().toISOString(),
-              lastLogin: new Date().toISOString(),
-              status: 'active'
-            } as any);
-            setIsLoading(false);
-            return;
-          }
+          // Check adminAccounts for staff and superadmin roles
+          const adminDocRef = doc(db, 'adminAccounts', firebaseUser.uid);
+          const adminDoc = await getDoc(adminDocRef);
 
-          // 2. Try adminAccounts
-          const adminDoc = await getDoc(doc(db, 'adminAccounts', firebaseUser.uid));
           if (adminDoc.exists()) {
             const adminData = adminDoc.data() as AdminAccount;
             if (adminData.status === 'active') {
@@ -236,7 +218,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          // 3. Try userAccounts (passenger)
+          // Fallback check to prevent lock out if Super Admin isn't in DB yet
+          const fallbackSuperAdminEmails = ['brgytanodsos@gmail.com', 'admin@mindorotransit.com', 'admin_new@mindorotransit.com'];
+          if (firebaseUser.email && fallbackSuperAdminEmails.includes(firebaseUser.email)) {
+            import('firebase/firestore').then(({ setDoc }) => {
+              setDoc(adminDocRef, {
+                id: firebaseUser.uid,
+                fullName: 'System Super Admin',
+                email: firebaseUser.email,
+                role: 'superadmin',
+                status: 'active',
+                createdAt: new Date().toISOString()
+              }, { merge: true });
+            });
+            setCurrentRole('superadmin');
+            setIsAuthenticated(true);
+            setCurrentUser({
+              id: firebaseUser.uid,
+              fullName: 'System Super Admin',
+              role: 'superadmin' as any,
+              email: firebaseUser.email || '',
+              status: 'active',
+              createdAt: new Date().toISOString()
+            } as any);
+            setIsLoading(false);
+            return;
+          }
+
+          // Try userAccounts (passenger)
           const passengerDoc = await getDoc(doc(db, 'userAccounts', firebaseUser.uid));
           if (passengerDoc.exists()) {
             const passengerData = passengerDoc.data() as UserAccount;
@@ -461,27 +470,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!autoSyncEnabled) return;
 
+    // Clear and load mock seed fallback prior to login / for unauthenticated users,
+    // avoiding immediate collection-level reads which spark permission-denied crashes.
+    if (!isAuthenticated) {
+      setShips(getMockSeed('ships'));
+      setTrips(getMockSeed('trips'));
+      setFerryBookings(getMockSeed('ferryBookings'));
+      setVanBookings(getMockSeed('vanBookings'));
+      setAnnouncements(getMockSeed('announcements'));
+      setTransactions(getMockSeed('transactions'));
+      setPayoutHistory(getMockSeed('payoutHistory'));
+      setAuditLog(getMockSeed('auditLog'));
+      setUserAccounts(getMockSeed('userAccounts'));
+      setAdminAccounts(getMockSeed('adminAccounts'));
+      return;
+    }
+
     setLastSyncTime(new Date());
 
     const unsubs: (() => void)[] = [];
 
-    const COLLECTIONS: { name: string; setter: React.Dispatch<React.SetStateAction<any[]>> }[] = [
-      { name: 'ships', setter: setShips },
-      { name: 'trips', setter: setTrips },
-      { name: 'ferryBookings', setter: setFerryBookings },
-      { name: 'vanBookings', setter: setVanBookings },
-      { name: 'announcements', setter: setAnnouncements },
-      { name: 'transactions', setter: setTransactions },
-      { name: 'payoutHistory', setter: setPayoutHistory },
-      { name: 'auditLog', setter: setAuditLog },
-      { name: 'userAccounts', setter: setUserAccounts },
-      { name: 'adminAccounts', setter: setAdminAccounts },
+    const isSuper = currentRole === 'superadmin';
+    const isStaff = currentRole === 'port' || currentRole === 'terminal' || currentRole === 'driver';
+    const isPassenger = currentRole === 'passenger';
+
+    // Specify active collections for the current role
+    const subsToRegister: { name: string; ref: any; setter: React.Dispatch<React.SetStateAction<any[]>> }[] = [
+      { name: 'ships', ref: collection(db, 'ships'), setter: setShips },
+      { name: 'trips', ref: collection(db, 'trips'), setter: setTrips },
+      { name: 'announcements', ref: collection(db, 'announcements'), setter: setAnnouncements },
     ];
 
-    for (const { name, setter } of COLLECTIONS) {
+    if (isSuper || isStaff) {
+      subsToRegister.push(
+        { name: 'ferryBookings', ref: collection(db, 'ferryBookings'), setter: setFerryBookings },
+        { name: 'vanBookings', ref: collection(db, 'vanBookings'), setter: setVanBookings },
+        { name: 'transactions', ref: collection(db, 'transactions'), setter: setTransactions },
+        { name: 'payoutHistory', ref: collection(db, 'payoutHistory'), setter: setPayoutHistory },
+        { name: 'auditLog', ref: collection(db, 'auditLog'), setter: setAuditLog }
+      );
+    }
+
+    if (isSuper) {
+      subsToRegister.push(
+        { name: 'userAccounts', ref: collection(db, 'userAccounts'), setter: setUserAccounts },
+        { name: 'adminAccounts', ref: collection(db, 'adminAccounts'), setter: setAdminAccounts }
+      );
+    }
+
+    // Port and Terminal staff need to view passenger profiles to link names/contacts,
+    // so we subscribe them to userAccounts if they are staff or super admin.
+    if (isStaff && !isSuper) {
+      subsToRegister.push(
+        { name: 'userAccounts', ref: collection(db, 'userAccounts'), setter: setUserAccounts }
+      );
+    }
+
+    // Register active collection listeners
+    for (const { name, ref, setter } of subsToRegister) {
       try {
         const u = onSnapshot(
-          collection(db, name),
+          ref,
           (snap) => {
             const items: any[] = [];
             snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -499,8 +548,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // Passengers can only read their OWN bookings from Firestore. Listening to the entire collection
+    // is blocked by write rules. Instead, register secure query listeners.
+    if (isPassenger) {
+      const passengerId = auth.currentUser?.uid || userAccount?.id || '';
+      if (passengerId) {
+        // Passenger Ferry Bookings
+        try {
+          const qFerry = query(collection(db, 'ferryBookings'), where('accountId', '==', passengerId));
+          const uFerry = onSnapshot(
+            qFerry,
+            (snap) => {
+              const items: any[] = [];
+              snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+              setFerryBookings(items.length > 0 ? items : getMockSeed('ferryBookings').filter(b => b.accountId === passengerId));
+            },
+            (err) => {
+              console.warn("Firestore listener error for passenger ferryBookings query:", err);
+              setFerryBookings(getMockSeed('ferryBookings').filter(b => b.accountId === passengerId));
+            }
+          );
+          unsubs.push(uFerry);
+        } catch (e) {
+          console.error("Passenger ferry query registration error:", e);
+        }
+
+        // Passenger Van Bookings
+        try {
+          const qVan = query(collection(db, 'vanBookings'), where('accountId', '==', passengerId));
+          const uVan = onSnapshot(
+            qVan,
+            (snap) => {
+              const items: any[] = [];
+              snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+              setVanBookings(items.length > 0 ? items : getMockSeed('vanBookings').filter(b => b.accountId === passengerId));
+            },
+            (err) => {
+              console.warn("Firestore listener error for passenger vanBookings query:", err);
+              setVanBookings(getMockSeed('vanBookings').filter(b => b.accountId === passengerId));
+            }
+          );
+          unsubs.push(uVan);
+        } catch (e) {
+          console.error("Passenger van query registration error:", e);
+        }
+      }
+    }
+
     return () => unsubs.forEach((fn) => fn());
-  }, [autoSyncEnabled]);
+  }, [autoSyncEnabled, isAuthenticated, currentRole, userAccount]);
 
   // ---------------------------------------------------------------------------
   // Persist helpers

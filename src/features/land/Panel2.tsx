@@ -38,6 +38,13 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
   const [capacity, setCapacity] = useState('14');
   const [searchPassenger, setSearchPassenger] = useState('');
   const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const sortedTrips = [...trips].sort((a, b) => {
+    const timeA = new Date(a.depTime || 0).getTime();
+    const timeB = new Date(b.depTime || 0).getTime();
+    return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+  });
 
   const activeTripsCount = trips.filter(t => t.status === 'Boarding' || t.status === 'Departed').length;
   const totalBookingsCount = vanBookings.length;
@@ -244,15 +251,38 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
         {activeTab === 'manager' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
-              <h2 className="text-lg font-black text-slate-800 tracking-tight">Terminal Shuttle Board</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
+                <h2 className="text-lg font-black text-slate-800 tracking-tight">Terminal Shuttle Board</h2>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Departure:</span>
+                  <button 
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-slate-50 hover:bg-slate-100 border border-slate-200/65 rounded-xl transition-all shadow-sm cursor-pointer select-none"
+                    title="Toggle Departure Time Sort"
+                  >
+                    <span>{sortOrder === 'asc' ? 'Earliest First' : 'Latest First'}</span>
+                    <i className={`fa-solid ${sortOrder === 'asc' ? 'fa-arrow-down-short-wide text-[#009E49]' : 'fa-arrow-up-wide-short text-[#FF8800]'}`}></i>
+                  </button>
+                </div>
+              </div>
               <div className="overflow-x-auto text-sm">
                 <table className="w-full text-left border-collapse min-w-[500px]">
                   <thead>
-                    <tr className="border-b text-[10px] font-black uppercase text-slate-400 font-sans"><th className="py-3">Driver</th><th className="py-3">Route</th><th className="py-3 text-center">Status</th></tr>
+                    <tr className="border-b text-[10px] font-black uppercase text-slate-400 font-sans">
+                      <th className="py-3">Driver</th>
+                      <th className="py-3">Route</th>
+                      <th className="py-3 cursor-pointer select-none group" onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
+                        <div className="flex items-center gap-1 hover:text-slate-600 transition-colors">
+                          <span className="group-hover:underline">Departure</span>
+                          <i className={`fa-solid ${sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down'} text-slate-400 group-hover:text-slate-600`}></i>
+                        </div>
+                      </th>
+                      <th className="py-3 text-center">Status</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y">
                     <AnimatePresence mode="popLayout">
-                    {trips.map(t => (
+                    {sortedTrips.map(t => (
                       <motion.tr 
                         key={t.id}
                         layout
@@ -260,9 +290,16 @@ export const Panel2 = ({ isSuperAdmin }: Panel2Props) => {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
+                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/40 transition-colors duration-150"
                       >
                         <td className="py-3.5"><div className="font-extrabold">{t.driver}</div><span className="text-[9px] uppercase font-black text-slate-400">{t.type}</span></td>
                         <td className="py-3.5 font-bold text-slate-600">{t.route}</td>
+                        <td className="py-3.5 text-slate-500 font-semibold text-xs whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <i className="fa-regular fa-calendar-days text-slate-450"></i>
+                            <span>{formatPST(t.depTime)}</span>
+                          </div>
+                        </td>
                         <td className="py-3.5 text-center">
                           <motion.div
                             key={`${t.id}-${t.status}`}

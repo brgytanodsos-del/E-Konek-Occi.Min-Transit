@@ -59,27 +59,91 @@ export {
   getDownloadURL
 };
 
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errMessage = error instanceof Error ? error.message : String(error);
+  const errInfo: FirestoreErrorInfo = {
+    error: errMessage,
+    authInfo: {
+      userId: auth.currentUser?.uid || null,
+      email: auth.currentUser?.email || null,
+      emailVerified: auth.currentUser?.emailVerified || null,
+      isAnonymous: auth.currentUser?.isAnonymous || null,
+      tenantId: auth.currentUser?.tenantId || null,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Hardened Diagnostics Info:', JSON.stringify(errInfo, null, 2));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export async function fsSet(collectionName: string, docId: string, data: any) {
-  const docRef = doc(db, collectionName, docId);
-  await setDoc(docRef, data, { merge: true });
-  return { success: true };
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await setDoc(docRef, data, { merge: true });
+    return { success: true };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${collectionName}/${docId}`);
+  }
 }
 
 export async function fsUpdate(collectionName: string, docId: string, data: any) {
-  const docRef = doc(db, collectionName, docId);
-  await updateDoc(docRef, data);
-  return { success: true };
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await updateDoc(docRef, data);
+    return { success: true };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `${collectionName}/${docId}`);
+  }
 }
 
 export async function fsDelete(collectionName: string, docId: string) {
-  const docRef = doc(db, collectionName, docId);
-  await deleteDoc(docRef);
-  return { success: true };
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${docId}`);
+  }
 }
 
 export async function fsAdd(collectionName: string, data: any) {
-  const id = Math.random().toString(36).substring(2, 11);
-  const docRef = doc(db, collectionName, id);
-  await setDoc(docRef, { ...data, id });
-  return { id, success: true };
+  try {
+    const id = Math.random().toString(36).substring(2, 11);
+    const docRef = doc(db, collectionName, id);
+    await setDoc(docRef, { ...data, id });
+    return { id, success: true };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, collectionName);
+  }
 }

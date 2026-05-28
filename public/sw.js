@@ -5,13 +5,18 @@ const { registerRoute } = workbox.routing;
 const { NetworkFirst, CacheFirst, StaleWhileRevalidate } = workbox.strategies;
 const { BackgroundSyncPlugin } = workbox.backgroundSync;
 
+self.skipWaiting();
+workbox.core.clientsClaim();
+
 precacheAndRoute(self.__WB_MANIFEST || []);
 cleanupOutdatedCaches();
 
 // Cache static assets
 registerRoute(
   ({ request }) => request.destination === 'image' || request.destination === 'style' || request.destination === 'script',
-  new CacheFirst()
+  new NetworkFirst({
+    cacheName: 'static-assets-cache'
+  })
 );
 
 // API routes - Network First with Background Sync fallback

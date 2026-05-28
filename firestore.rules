@@ -5,26 +5,74 @@ service cloud.firestore {
     
     // ── Helpers ─────────────────────────────────────
     function isAuthenticated() { return request.auth != null; }
-    function isSuperAdmin() { return request.auth != null && request.auth.token.role == 'superadmin'; }
-    function isPortAdmin() { return request.auth != null && request.auth.token.role == 'port'; }
-    function isTerminalAdmin() { return request.auth != null && request.auth.token.role == 'terminal'; }
+
+    // Support both Custom Claims (fast, approved) and Doc fallback (instant for bootstrap and registration)s
+    function isSuperAdmin() { 
+      return isAuthenticated() && (
+        request.auth.token.role == 'superadmin' || 
+        request.auth.token.email == 'brgytanodsos@gmail.com' ||
+        request.auth.token.email == 'admin@mindorotransit.com' ||
+        request.auth.token.email == 'admin_new@mindorotransit.com' ||
+        (exists(/databases/{database}/documents/adminAccounts/$(request.auth.uid)) && 
+         get(/databases/{database}/documents/adminAccounts/$(request.auth.uid)).data.role == 'superadmin')
+      ); 
+    }
+    
+    function isPortAdmin() { 
+      return isAuthenticated() && (
+        request.auth.token.role == 'port' || 
+        request.auth.token.email == 'port@mindorotransit.com' ||
+        (exists(/databases/{database}/documents/adminAccounts/$(request.auth.uid)) && 
+         get(/databases/{database}/documents/adminAccounts/$(request.auth.uid)).data.role == 'port')
+      ); 
+    }
+    
+    function isTerminalAdmin() { 
+      return isAuthenticated() && (
+        request.auth.token.role == 'terminal' || 
+        request.auth.token.email == 'terminal@mindorotransit.com' ||
+        (exists(/databases/{database}/documents/adminAccounts/$(request.auth.uid)) && 
+         get(/databases/{database}/documents/adminAccounts/$(request.auth.uid)).data.role == 'terminal')
+      ); 
+    }
+    
     function isStaffOrAdmin() { return isPortAdmin() || isTerminalAdmin() || isSuperAdmin(); }
     function isOwner(uid) { return request.auth.uid == uid; }
 
     function isValidTimestamp() {
-      return request.resource.data.syncedAt is timestamp &&
-             request.resource.data.syncedAt == request.time;
+      return !('syncedAt' in request.resource.data) || (
+        request.resource.data.syncedAt is timestamp &&
+        request.resource.data.syncedAt == request.time
+      );
     }
 
     // ── Core Collections ────────────────────────────
     match /ships/{shipId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin() || isPortAdmin();
+      
+      match /priceHistory/{historyId} {
+        allow read: if isAuthenticated();
+        allow write: if isStaffOrAdmin();
+      }
     }
 
     match /trips/{tripId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin() || isTerminalAdmin();
+      
+      match /priceHistory/{historyId} {
+        allow read: if isAuthenticated();
+        allow write: if isStaffOrAdmin();
+      }
+    }
+
+    match /priceAdjustmentRequests/{requestId} {
+      allow read, write: if isStaffOrAdmin();
+    }
+
+    match /payouts/{payoutId} {
+      allow read, write: if isStaffOrAdmin();
     }
 
     match /ferryBookings/{bookingId} {
@@ -42,7 +90,8 @@ service cloud.firestore {
     }
 
     match /userAccounts/{userId} {
-      allow read, write: if isOwner(userId) || isSuperAdmin();
+      allow read: if isOwner(userId) || isStaffOrAdmin();
+      allow write: if isOwner(userId) || isSuperAdmin();
     }
 
     // Admin & Financial - stricter

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SurfaceCard } from './ui';
 import { Button } from './ui/Button';
 import { DollarSign, CheckCircle } from 'lucide-react';
@@ -24,6 +24,9 @@ export const CommissionPayout: React.FC = () => {
     const q = query(collection(db, 'payouts'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setPayouts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Payout)));
+    }, (error) => {
+      console.warn("Firestore listener error for payouts:", error);
+      handleFirestoreError(error, OperationType.LIST, 'payouts');
     });
     return unsubscribe;
   }, []);

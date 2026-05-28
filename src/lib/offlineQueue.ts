@@ -1,5 +1,5 @@
 import { offlineDb } from './offlineDb';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase'; // your Firebase config
 import { toast } from 'sonner';
 
@@ -59,11 +59,11 @@ class OfflineQueueService {
         case 'booking':
         case 'create':
           if (op.docId) {
-            await updateDoc(doc(db, op.collection, op.docId), {
+            await setDoc(doc(db, op.collection, op.docId), {
               ...op.payload,
               syncedAt: serverTimestamp(),
               syncedBy: op.userId,
-            });
+            }, { merge: true });
           } else {
             await addDoc(colRef, {
               ...op.payload,

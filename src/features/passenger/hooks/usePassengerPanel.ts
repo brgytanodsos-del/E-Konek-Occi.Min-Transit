@@ -3,6 +3,7 @@ import { useApp } from '../../../context/AppContext';
 import { speakAnnouncement } from '../../../utils/speech';
 import { offlineQueue } from '../../../lib/offlineQueue';
 import { Ship, Trip } from '../../../types/dataTypes';
+import { auth } from '../../../lib/firebase';
 
 export function usePassengerPanel() {
   const app = useApp();
@@ -95,16 +96,28 @@ export function usePassengerPanel() {
   }, []);
 
   const safePersistFerryBooking = useCallback(async (bookingData: any) => {
+    const bookingId = 'fb-' + Math.random().toString(36).substring(2, 11);
+    const finalBooking = {
+      id: bookingId,
+      shipId: bookingData.voyageId || '',
+      name: bookingData.ferryName || userAccount?.fullName || 'Guest Passenger',
+      contact: bookingData.ferryContact || userAccount?.mobileNumber || '',
+      type: (bookingData.ticketType || 'Regular') as any,
+      status: 'Pending' as const,
+      accountId: userAccount?.id || auth.currentUser?.uid || 'passenger-guest',
+    };
+
     const operation = {
       type: 'booking' as const,
       collection: 'ferryBookings',
-      userId: userAccount?.id || 'unknown',
+      userId: userAccount?.id || auth.currentUser?.uid || 'unknown',
       role: 'passenger',
-      payload: { ...bookingData, createdAt: new Date(), status: 'pending', createdBy: userAccount?.id },
+      docId: bookingId,
+      payload: finalBooking,
     };
     try {
       if (isOnline) {
-        await persistFerryBooking(bookingData);
+        await persistFerryBooking(finalBooking);
         setToastMessage("Ferry booking confirmed");
       } else {
         await offlineQueue.add(operation);
@@ -117,16 +130,29 @@ export function usePassengerPanel() {
   }, [isOnline, userAccount, pendingQueueCount, persistFerryBooking, setToastMessage]);
 
   const safePersistVanBooking = useCallback(async (bookingData: any) => {
+    const bookingId = 'vb-' + Math.random().toString(36).substring(2, 11);
+    const finalBooking = {
+      id: bookingId,
+      tripId: bookingData.tripId || '',
+      pickup: bookingData.pickupPoint || '',
+      name: bookingData.shuttleName || userAccount?.fullName || 'Guest Passenger',
+      contact: bookingData.shuttleContact || userAccount?.mobileNumber || '',
+      seats: Number(bookingData.seatsCount) || 1,
+      status: 'Pending' as const,
+      accountId: userAccount?.id || auth.currentUser?.uid || 'passenger-guest',
+    };
+
     const operation = {
       type: 'booking' as const,
       collection: 'vanBookings',
-      userId: userAccount?.id || 'unknown',
+      userId: userAccount?.id || auth.currentUser?.uid || 'unknown',
       role: 'passenger',
-      payload: { ...bookingData, createdAt: new Date() },
+      docId: bookingId,
+      payload: finalBooking,
     };
     try {
       if (isOnline) {
-        await persistVanBooking(bookingData);
+        await persistVanBooking(finalBooking);
         setToastMessage("Shuttle booking confirmed");
       } else {
         await offlineQueue.add(operation);
@@ -136,7 +162,7 @@ export function usePassengerPanel() {
       await offlineQueue.add(operation);
       setToastMessage("Saved offline");
     }
-  }, [isOnline, persistVanBooking, setToastMessage, userAccount]);
+  }, [isOnline, persistVanBooking, setToastMessage, userAccount, pendingQueueCount]);
 
   const safeCreateTrip = useCallback(async (tripData: any) => {
     const operation = {

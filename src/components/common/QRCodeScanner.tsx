@@ -3,6 +3,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import { toast } from 'sonner';
 import { useApp } from '../../context/AppContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { motion } from 'motion/react';
 
 interface QRCodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -112,11 +113,41 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl p-4 w-full max-w-sm relative">
         <h3 className="text-lg font-semibold mb-4">{title}</h3>
-        <div className="relative w-full">
-          <div id="qr-reader" className="w-full"></div>
+        <div className="relative w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
+          <div id="qr-reader" className="w-full relative z-0 [&>div]:!border-none [&_video]:!object-cover"></div>
+          
+          {/* Custom Scanner Frame Guide & Overlay */}
+          <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+            {/* Darkened outer region */}
+            <div className="absolute inset-0 bg-black/40"></div>
+            
+            {/* Clear center hole (using box-shadow hack on a transparent div) */}
+            <div className="relative w-56 h-56 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]">
+              {/* Corner brackets */}
+              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl"></div>
+              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl"></div>
+              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl"></div>
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl"></div>
+              
+              {/* Animated scanning laser line */}
+              <motion.div 
+                className="w-full h-0.5 bg-emerald-400 absolute left-0 shadow-[0_0_8px_2px_rgba(52,211,153,0.8)]"
+                animate={{ top: ['0%', '100%', '0%'] }}
+                transition={{ duration: 3, ease: 'linear', repeat: Infinity }}
+              />
+              
+              {/* Ticket position text */}
+              <div className="absolute -bottom-8 left-0 right-0 text-center flex justify-center">
+                <span className="bg-black/60 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">
+                  Position QR in frame
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Status Indicator */}
-          <div className="absolute inset-x-0 bottom-4 flex justify-center z-10 pointer-events-none">
-            <span className={`${getStatusColor(scanState)} text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg animate-pulse flex items-center gap-2`}>
+          <div className="absolute inset-x-0 bottom-4 flex justify-center z-20 pointer-events-none">
+            <span className={`${getStatusColor(scanState)} text-white px-4 py-2 rounded-full text-xs font-black shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-2 uppercase tracking-wide`}>
               {scanState === 'validating' && <i className="fa-solid fa-spinner fa-spin"></i>}
               {scanState === 'success' && <i className="fa-solid fa-check"></i>}
               {scanState === 'error' && <i className="fa-solid fa-xmark"></i>}

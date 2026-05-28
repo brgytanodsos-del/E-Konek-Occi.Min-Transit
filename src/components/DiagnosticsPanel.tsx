@@ -10,14 +10,56 @@ interface ScanLog {
   payload: string;
 }
 
+const playSound = (type: 'success' | 'invalid') => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const audioCtx = new AudioContext();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'success') {
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    } else {
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+      oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+      
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    }
+  } catch (e) {
+    console.warn('Audio playback failed or not supported:', e);
+  }
+};
+
 export const DiagnosticsPanel = () => {
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [scanResult, setScanResult] = useState<'success' | 'invalid' | null>(null);
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [selectedLogPayload, setSelectedLogPayload] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'success' | 'invalid'>('all');
 
   const simulateScan = (isValid: boolean) => {
     setScanResult(isValid ? 'success' : 'invalid');
+    playSound(isValid ? 'success' : 'invalid');
     
     const newLog: ScanLog = {
       id: Math.random().toString(36).substring(2, 9),
@@ -32,6 +74,15 @@ export const DiagnosticsPanel = () => {
       setIsQRModalOpen(false);
     }, 2000);
   };
+
+  const totalScans = logs.length;
+  const successScans = logs.filter(log => log.result === 'success').length;
+  const errorScans = totalScans - successScans;
+
+  const filteredLogs = logs.filter(log => {
+    if (filterType === 'all') return true;
+    return log.result === filterType;
+  });
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 pb-[100px]">
@@ -62,11 +113,37 @@ export const DiagnosticsPanel = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">Total Scans</span>
+              <span className="text-2xl font-black text-slate-800 dark:text-white">{totalScans}</span>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-emerald-200/50 dark:border-emerald-500/20 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Successful</span>
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{successScans}</span>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-rose-200/50 dark:border-rose-500/20 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-1">Failed</span>
+              <span className="text-2xl font-black text-rose-600 dark:text-rose-400">{errorScans}</span>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-slate-800 rounded-[24px] p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-              <i className="fa-solid fa-list-check text-emerald-500"></i>
-              Recent Scan Logs
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="fa-solid fa-list-check text-emerald-500"></i>
+                Recent Scan Logs
+              </h3>
+              <select 
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl px-3 py-1.5 outline-none focus:border-emerald-500 transition-colors"
+              >
+                <option value="all">All Results</option>
+                <option value="success">Successful</option>
+                <option value="invalid">Failed</option>
+              </select>
+            </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400">
@@ -78,14 +155,14 @@ export const DiagnosticsPanel = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.length === 0 ? (
+                  {filteredLogs.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="px-4 py-8 text-center text-slate-400 font-medium text-xs">
-                        No scan logs available. Run a mock scan to see results.
+                        No scan logs found.
                       </td>
                     </tr>
                   ) : (
-                    logs.map(log => (
+                    filteredLogs.map(log => (
                       <tr key={log.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">
                           {log.timestamp.toLocaleTimeString()}

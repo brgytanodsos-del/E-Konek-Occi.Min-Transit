@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mic } from 'lucide-react';
 import { VoiceAssistantPanel } from './VoiceAssistantPanel';
 import { PanelHeader } from './common/PanelHeader';
+import { toast } from 'sonner';
 
 import { AdminReportSectionPanel4 } from './AdminReportSectionPanel4';
 import { PendingApprovalsPanel } from './PendingApprovalsPanel';
@@ -56,6 +57,17 @@ export const SuperAdminDashboard = () => {
 
   // Super Admin voice assistant modal
   const [isVoicePanelOpen, setIsVoicePanelOpen] = useState(false);
+
+  // Toggle auto-sync with feedback
+  const handleToggleAutoSync = () => {
+    const nextState = !autoSyncEnabled;
+    setAutoSyncEnabled(nextState);
+    if (nextState) {
+      toast.success('🔄 Live Database Auto-Sync Enabled');
+    } else {
+      toast.warning('🚫 Background Database Sync Paused');
+    }
+  };
 
   // Background Voice Listener
   useEffect(() => {
@@ -154,8 +166,8 @@ export const SuperAdminDashboard = () => {
         {isOnline ? '🟢 Online — Live Data' : '🔴 Offline — Cached Mode'}
       </div>
 
-      {/* Adjust container padding-top for the 28px height status bar */}
-      <div className="pt-[28px] flex-1 flex flex-col">
+      {/* Adjust container padding-top for the 32px height status bar */}
+      <div className="pt-[32px] flex-1 flex flex-col">
         
         {/* VIEW SCHEME: PORT STAFF */}
         {currentRole === 'port' && (
@@ -203,31 +215,36 @@ export const SuperAdminDashboard = () => {
           <div className="flex-1 flex flex-col">
             
             {/* Topbar for Admin */}
-            <header className="dashboard-header bg-white/80 border-b border-slate-200/70 py-4 px-6 flex justify-between items-center shadow-sm">
-              <div className="flex items-center gap-2">
+            <header className="dashboard-header bg-white/90 dark:bg-slate-900/90 border-b border-slate-200/70 dark:border-slate-800/80 py-3 sm:py-4 px-3 sm:px-6 flex justify-between items-center shadow-sm relative backdrop-blur-md">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className="bg-[#FF6B00] text-white font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded">ADMIN MODE</span>
-                <span className="font-bold text-sm text-gray-500 font-sans">E-Transit Hub</span>
+                <span className="font-bold text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-sans hidden sm:inline">E-Transit Hub</span>
               </div>
 
               {/* Secure Confirm Logout */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-3">
                 {/* Auto Sync Toggle */}
-                <div className="flex items-center gap-2 mr-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/50">
-                  <div className="flex flex-col items-end mr-1">
-                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Sync {autoSyncEnabled ? 'On' : 'Off'}</span>
-                     <span className="text-[8px] text-slate-400 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/50 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-750">
+                  <div className="hidden md:flex flex-col items-end mr-1">
+                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sync {autoSyncEnabled ? 'On' : 'Off'}</span>
+                     <span className="text-[8px] text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">
                         {lastSyncTime ? `Last: ${lastSyncTime.toLocaleTimeString()}` : 'Never'}
                      </span>
                   </div>
+                  <div className="hidden min-[380px]:flex md:hidden flex-col items-center pl-0.5">
+                     <span className="text-[8px] font-bold text-slate-550 dark:text-slate-400 uppercase tracking-widest">Sync</span>
+                  </div>
                   <button
-                    onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${autoSyncEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    id="super-admin-auto-sync-toggle"
+                    onClick={handleToggleAutoSync}
+                    className={`relative inline-flex h-4 w-7 sm:h-5 sm:w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${autoSyncEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                     role="switch"
                     aria-checked={autoSyncEnabled}
+                    title="Toggle background database syncing on or off"
                   >
                     <span
                       aria-hidden="true"
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0'}`}
+                      className={`pointer-events-none inline-block h-3 w-3 sm:h-4 sm:w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${autoSyncEnabled ? 'translate-x-3 sm:translate-x-4' : 'translate-x-0'}`}
                     />
                   </button>
                 </div>
@@ -236,16 +253,16 @@ export const SuperAdminDashboard = () => {
                   <button
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md relative"
+                    className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md relative"
                     title="View dynamic command alerts"
                   >
-                    <i className="fa-solid fa-bell text-sm text-[#003580] dark:text-indigo-400" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    <i className="fa-solid fa-bell text-xs sm:text-sm text-[#003580] dark:text-indigo-400" />
+                    <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-rose-500 animate-pulse" />
                   </button>
 
                   <AnimatePresence>
                     {isNotificationsOpen && (
-                      <div className="absolute right-0 mt-3.5 w-[320px] sm:w-[380px] z-50 shadow-2xl rounded-3xl overflow-hidden animate-fade-in">
+                      <div className="absolute right-0 mt-3.5 w-[280px] sm:w-[380px] z-[60] shadow-2xl rounded-3xl overflow-hidden animate-fade-in">
                         <NotificationsPanel onClose={() => setIsNotificationsOpen(false)} />
                       </div>
                     )}
@@ -254,30 +271,30 @@ export const SuperAdminDashboard = () => {
 
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
+                  className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white/75 text-slate-700 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-200 cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-sm backdrop-blur-md"
                   title="Toggle visual theme"
                 >
-                  {isDarkMode ? <i className="fa-solid fa-sun text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-sm text-[#003580]" />}
+                  {isDarkMode ? <i className="fa-solid fa-sun text-xs sm:text-sm text-amber-500" /> : <i className="fa-solid fa-moon text-xs sm:text-sm text-[#003580]" />}
                 </button>
                 {!showConfirmLogout ? (
                   <button
                     onClick={() => setShowConfirmLogout(true)}
-                    className="flex h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
+                    className="flex h-9 sm:h-10 items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-[10px] sm:text-xs px-2.5 sm:px-4 rounded-xl sm:rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
                   >
-                    🔐 Logout
+                    🔐 <span className="hidden sm:inline ml-1">Logout</span>
                   </button>
                 ) : (
-                  <div className="flex items-center h-10 gap-2 bg-red-50 p-1 rounded-2xl border border-red-200 shadow-xs">
-                    <span className="text-[10px] font-black text-red-700 font-mono pl-3 py-1">Are you sure?</span>
+                  <div className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 flex items-center h-10 gap-1.5 bg-white/95 dark:bg-slate-850 border border-red-200 dark:border-red-900/40 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl shadow-xl z-50 animate-fade-in text-slate-900 dark:text-white">
+                    <span className="text-[10px] font-black text-red-700 dark:text-red-400 font-mono pl-2 sm:pl-3">Logout?</span>
                     <button
                       onClick={handleLogoutAction}
-                      className="bg-red-600 text-white font-bold text-[10px] px-3 h-8 rounded-xl hover:bg-red-700 cursor-pointer transition-colors active:scale-95"
+                      className="bg-red-600 text-white font-bold text-[9px] sm:text-[10px] px-2.5 sm:px-3 h-7 sm:h-8 rounded-lg hover:bg-red-700 cursor-pointer transition-colors active:scale-95"
                     >
                       Yes
                     </button>
                     <button
                       onClick={() => setShowConfirmLogout(false)}
-                      className="bg-gray-200 text-gray-700 font-bold text-[10px] px-3 h-8 rounded-xl hover:bg-gray-300 cursor-pointer transition-colors active:scale-95"
+                      className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-705 dark:hover:bg-slate-650 text-gray-700 dark:text-gray-300 font-bold text-[9px] sm:text-[10px] px-2.5 sm:px-3 h-7 sm:h-8 rounded-lg cursor-pointer transition-colors active:scale-95"
                     >
                       No
                     </button>
@@ -310,7 +327,10 @@ export const SuperAdminDashboard = () => {
             </div>
 
             {/* FIXED BOTTOM NAV BAR (z-index 50) */}
-            <nav className="dashboard-nav fixed bottom-0 sm:bottom-6 left-0 sm:left-1/2 right-0 sm:right-auto sm:-translate-x-1/2 bg-white/90 backdrop-blur-xl border border-slate-200/50 sm:rounded-[24px] rounded-t-[24px] h-[76px] z-50 flex justify-around items-center px-6 shadow-2xl sm:min-w-[580px] transition-all overflow-hidden flex-nowrap">
+            <nav 
+              className="dashboard-nav fixed bottom-0 sm:bottom-6 left-0 sm:left-1/2 right-0 sm:right-auto sm:-translate-x-1/2 bg-white/90 backdrop-blur-xl border border-slate-200/50 sm:rounded-[24px] rounded-t-[24px] h-[76px] z-50 flex justify-start sm:justify-around items-center px-4 sm:px-6 shadow-2xl w-full sm:min-w-[620px] transition-all overflow-x-auto sm:overflow-x-visible flex-row flex-nowrap gap-2 sm:gap-1 scrollbar-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               {[
                 { id: 0, label: 'Port', icon: 'fa-ship', color: 'text-blue-600', activeBg: 'bg-blue-50' },
                 { id: 1, label: 'Hub', icon: 'fa-bus', color: 'text-orange-500', activeBg: 'bg-orange-50' },
@@ -324,16 +344,16 @@ export const SuperAdminDashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => setAdminActiveTab(tab.id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center h-full px-2 cursor-pointer transition-all duration-300 ease-out group ${
-                    adminActiveTab === tab.id ? 'text-slate-900 scale-105' : 'text-slate-400 hover:text-slate-600'
+                  className={`relative shrink-0 flex-none flex flex-col items-center justify-center h-full w-[72px] sm:w-[76px] cursor-pointer transition-all duration-300 ease-out group ${
+                    adminActiveTab === tab.id ? 'text-slate-900 scale-102 font-bold' : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
-                  <div className={`flex flex-col items-center justify-center p-2 rounded-xl transition-colors ${adminActiveTab === tab.id ? tab.activeBg : 'bg-transparent group-hover:bg-slate-50'}`}>
-                    <i className={`fa-solid ${tab.icon} text-lg mb-1 transition-transform ${adminActiveTab === tab.id ? `${tab.color} drop-shadow-sm` : ''}`}></i>
-                    <span className={`text-[9px] font-black uppercase tracking-widest font-sans transition-all ${adminActiveTab === tab.id ? tab.color : ''}`}>{tab.label}</span>
+                  <div className={`flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl transition-all duration-200 ${adminActiveTab === tab.id ? tab.activeBg : 'bg-transparent group-hover:bg-slate-50'}`}>
+                    <i className={`fa-solid ${tab.icon} text-sm sm:text-base mb-1 transition-transform group-hover:scale-105 duration-200 ${adminActiveTab === tab.id ? `${tab.color} drop-shadow-xs` : ''}`}></i>
+                    <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider font-sans transition-all ${adminActiveTab === tab.id ? `${tab.color} font-black` : ''}`}>{tab.label}</span>
                   </div>
                   {adminActiveTab === tab.id && (
-                    <motion.div layoutId="nav-indicator" className={`absolute -bottom-1 w-8 h-1.5 rounded-full ${tab.color.replace('text-', 'bg-')} shadow-sm`} />
+                    <motion.div layoutId="nav-indicator" className={`absolute bottom-0 w-8 h-1 rounded-full ${tab.color.replace('text-', 'bg-')} shadow-xs`} />
                   )}
                 </button>
               ))}

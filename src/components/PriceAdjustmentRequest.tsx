@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, onSnapshot, updateDoc, doc, query } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import { SurfaceCard } from './ui';
 import { Button } from './ui/Button';
@@ -37,6 +37,9 @@ export const PriceAdjustmentRequest: React.FC = () => {
     const q = query(collection(db, 'priceAdjustmentRequests'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PriceAdjustmentReq)));
+    }, (error) => {
+      console.warn("Firestore listener error for priceAdjustmentRequests:", error);
+      handleFirestoreError(error, OperationType.LIST, 'priceAdjustmentRequests');
     });
     return unsubscribe;
   }, []);
